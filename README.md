@@ -78,6 +78,7 @@ npm run test:preview
 GitHub Actions runs two jobs on pushes and pull requests:
 
 - `npm run test:smoke` (unit tests + type checks + app build)
+- `npm run test:preview` (production preview auth + health probes)
 - `npm run build-storybook`
 
 For local production checks, `npm run test:preview` runs against `vite preview` with Cloudflare
