@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
 	chatRequestSchema,
 	createConversationRequestSchema,
+	createMemoryRequestSchema,
 	imageRequestSchema,
 	parseJsonBody,
-	updateConversationRequestSchema
+	updateConversationRequestSchema,
+	updateMemoryRequestSchema
 } from './validation';
 
 describe('parseJsonBody', () => {
@@ -78,6 +80,35 @@ describe('parseJsonBody', () => {
 		expect(payload).toMatchObject({
 			title: 'Product roadmap',
 			model: 'glm-4.7'
+		});
+	});
+
+	it('requires conversationId for conversation-scoped memory', async () => {
+		const request = new Request('http://example.test/memories', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				scope: 'conversation',
+				content: 'Remember this'
+			})
+		});
+		await expect(parseJsonBody(request, createMemoryRequestSchema)).rejects.toMatchObject({
+			status: 400,
+			body: { message: 'conversationId is required for conversation memory' }
+		});
+	});
+
+	it('requires at least one memory update field', async () => {
+		const request = new Request('http://example.test/memories', {
+			method: 'PATCH',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				id: 'mem_123'
+			})
+		});
+		await expect(parseJsonBody(request, updateMemoryRequestSchema)).rejects.toMatchObject({
+			status: 400,
+			body: { message: 'No memory updates provided' }
 		});
 	});
 });

@@ -1,8 +1,9 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
-import { createMemory, deleteMemory, listMemories, updateMemory } from '$lib/server/db';
+import { createMemory, deleteMemory, getConversationById, listMemories, updateMemory } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { created, ok } from '$lib/server/http';
+import { createMemoryRequestSchema, parseJsonBody, updateMemoryRequestSchema } from '$lib/server/validation';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async (event) => {
@@ -18,23 +19,21 @@ export const GET: RequestHandler = async (event) => {
 export const POST: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const body = (await event.request.json().catch(() => ({}))) as {
-		scope?: 'global' | 'conversation';
-		conversationId?: string | null;
-		content?: string;
-		tags?: string[];
-		score?: number;
-	};
-	const content = body.content?.trim();
-	if (!content) {
-		throw error(400, 'Memory content is required');
+	const body = await parseJsonBody(event.request, createMemoryRequestSchema);
+	const scope = body.scope ?? 'global';
+	const conversationId = scope === 'conversation' ? body.conversationId ?? null : null;
+	if (conversationId) {
+		const conversation = await getConversationById(env.DB, conversationId);
+		if (!conversation) {
+			throw error(404, 'Conversation not found');
+		}
 	}
 
 	const memory = await createMemory(env.DB, {
 		id: crypto.randomUUID(),
-		scope: body.scope ?? 'global',
-		conversationId: body.scope === 'conversation' ? body.conversationId ?? null : null,
-		content,
+		scope,
+		conversationId,
+		content: body.content,
 		tags: body.tags ?? [],
 		score: body.score ?? 1
 	});
@@ -57,19 +56,11 @@ export const POST: RequestHandler = async (event) => {
 export const PATCH: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const body = (await event.request.json().catch(() => ({}))) as {
-		id?: string;
-		content?: string;
-		tags?: string[];
-		score?: number;
-	};
-	if (!body.id) {
-		throw error(400, 'Memory id is required');
-	}
+	const body = await parseJsonBody(event.request, updateMemoryRequestSchema);
 
 	const updated = await updateMemory(env.DB, {
 		id: body.id,
-		content: body.content?.trim(),
+		content: body.content,
 		tags: body.tags,
 		score: body.score
 	});
@@ -95,7 +86,7 @@ export const PATCH: RequestHandler = async (event) => {
 export const DELETE: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const id = event.url.searchParams.get('id');
+	const id = event.url.searchParams.get('id')?.trim();
 	if (!id) {
 		throw error(400, 'Memory id is required');
 	}

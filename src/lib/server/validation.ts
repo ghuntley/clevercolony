@@ -7,6 +7,14 @@ const providerSchema = z.enum(['zai', 'cloudflare-ai']);
 const conversationIdSchema = z.string().trim().min(1, 'conversationId is required');
 const modelSchema = z.string().trim().min(1, 'model cannot be empty').optional();
 const titleSchema = z.string().trim().min(1, 'title cannot be empty').max(120, 'title is too long');
+const tagSchema = z.string().trim().min(1, 'tags cannot contain empty values').max(64, 'tag is too long');
+const tagsSchema = z.array(tagSchema).max(16, 'too many tags').optional();
+const scoreSchema = z.number().finite().min(0, 'score must be at least 0').max(10, 'score must be at most 10');
+const memoryContentSchema = z
+	.string()
+	.trim()
+	.min(1, 'Memory content is required')
+	.max(4000, 'Memory content is too long');
 
 export const chatRequestSchema = z.object({
 	conversationId: conversationIdSchema,
@@ -54,6 +62,29 @@ export const updateConversationRequestSchema = z
 			message: 'No updatable fields provided'
 		}
 	);
+
+export const createMemoryRequestSchema = z
+	.object({
+		scope: z.enum(['global', 'conversation']).optional(),
+		conversationId: z.string().trim().min(1, 'conversationId cannot be empty').nullable().optional(),
+		content: memoryContentSchema,
+		tags: tagsSchema,
+		score: scoreSchema.optional()
+	})
+	.refine((input) => input.scope !== 'conversation' || Boolean(input.conversationId), {
+		message: 'conversationId is required for conversation memory'
+	});
+
+export const updateMemoryRequestSchema = z
+	.object({
+		id: z.string().trim().min(1, 'Memory id is required'),
+		content: memoryContentSchema.optional(),
+		tags: tagsSchema,
+		score: scoreSchema.optional()
+	})
+	.refine((input) => input.content !== undefined || input.tags !== undefined || input.score !== undefined, {
+		message: 'No memory updates provided'
+	});
 
 export async function parseJsonBody<TSchema extends z.ZodTypeAny>(
 	request: Request,
