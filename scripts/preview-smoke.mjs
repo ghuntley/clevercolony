@@ -39,6 +39,15 @@ async function readJsonSafe(response) {
 	}
 }
 
+async function assertAuthRequired(response, endpointLabel) {
+	assert(response.status === 401, `Expected ${endpointLabel} to return 401, got ${response.status}`);
+	const body = await readJsonSafe(response);
+	assert(
+		body.error === 'Authentication required',
+		`Expected ${endpointLabel} 401 payload to include Authentication required message`
+	);
+}
+
 function toBase64Url(bytes) {
 	return Buffer.from(bytes)
 		.toString('base64')
@@ -177,15 +186,7 @@ async function run() {
 		);
 
 		const modelsResponse = await fetch(`${baseUrl}/api/models`, { redirect: 'manual' });
-		assert(
-			modelsResponse.status === 401,
-			`Expected unauthenticated /api/models to return 401, got ${modelsResponse.status}`
-		);
-		const modelsBody = await readJsonSafe(modelsResponse);
-		assert(
-			modelsBody.error === 'Authentication required',
-			`Expected /api/models 401 payload to include Authentication required message`
-		);
+		await assertAuthRequired(modelsResponse, 'unauthenticated /api/models');
 		const unauthenticatedChatResponse = await fetch(`${baseUrl}/api/chat`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -196,14 +197,20 @@ async function run() {
 				messages: [{ role: 'user', content: 'hello' }]
 			})
 		});
-		assert(
-			unauthenticatedChatResponse.status === 401,
-			`Expected unauthenticated /api/chat to return 401, got ${unauthenticatedChatResponse.status}`
+		await assertAuthRequired(unauthenticatedChatResponse, 'unauthenticated /api/chat');
+		const unauthenticatedConversationsResponse = await fetch(`${baseUrl}/api/conversations`);
+		await assertAuthRequired(
+			unauthenticatedConversationsResponse,
+			'unauthenticated /api/conversations'
 		);
-		const unauthenticatedChatBody = await readJsonSafe(unauthenticatedChatResponse);
-		assert(
-			unauthenticatedChatBody.error === 'Authentication required',
-			'Expected unauthenticated /api/chat payload to include Authentication required message'
+		const unauthenticatedMemoriesResponse = await fetch(`${baseUrl}/api/memories`);
+		await assertAuthRequired(unauthenticatedMemoriesResponse, 'unauthenticated /api/memories');
+		const unauthenticatedAuditResponse = await fetch(`${baseUrl}/api/audit`);
+		await assertAuthRequired(unauthenticatedAuditResponse, 'unauthenticated /api/audit');
+		const unauthenticatedImageAssetResponse = await fetch(`${baseUrl}/api/images/non-existent-asset-id`);
+		await assertAuthRequired(
+			unauthenticatedImageAssetResponse,
+			'unauthenticated /api/images/:id'
 		);
 
 		const malformedLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
@@ -335,15 +342,21 @@ async function run() {
 				cookie: sessionCookieHeader
 			}
 		});
-		assert(
-			modelsAfterLogoutResponse.status === 401,
-			`Expected /api/models to return 401 after logout, got ${modelsAfterLogoutResponse.status}`
-		);
-		const modelsAfterLogoutBody = await readJsonSafe(modelsAfterLogoutResponse);
-		assert(
-			modelsAfterLogoutBody.error === 'Authentication required',
-			'Expected post-logout /api/models payload to include Authentication required message'
-		);
+		await assertAuthRequired(modelsAfterLogoutResponse, 'post-logout /api/models');
+		const chatAfterLogoutResponse = await fetch(`${baseUrl}/api/chat`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: sessionCookieHeader
+			},
+			body: JSON.stringify({
+				conversationId: 'test-conversation',
+				provider: 'zai',
+				model: 'glm-4.7',
+				messages: [{ role: 'user', content: 'hello again' }]
+			})
+		});
+		await assertAuthRequired(chatAfterLogoutResponse, 'post-logout /api/chat');
 
 		console.log('Preview smoke checks passed.');
 	} finally {
