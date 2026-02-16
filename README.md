@@ -166,6 +166,7 @@ npm run test:smoke
 ## Security posture (MVP)
 
 - Shared-password session gate (browser-session cookie only)
+- Session cookie is `HttpOnly`, `SameSite=Lax`, and uses `Secure` on HTTPS origins (with HTTP dev fallback).
 - Audit events are immutable by API contract and hash-chained
 - R2 image retrieval is auth-gated
 - Mermaid rendering uses strict security mode
