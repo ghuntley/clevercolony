@@ -5,6 +5,7 @@ describe('isUnprotectedPath', () => {
 	it('allows login route and static assets', () => {
 		expect(isUnprotectedPath('/login')).toBe(true);
 		expect(isUnprotectedPath('/_app/immutable/chunk.js')).toBe(true);
+		expect(isUnprotectedPath('/_app/version.json')).toBe(true);
 		expect(isUnprotectedPath('/favicon.ico')).toBe(true);
 		expect(isUnprotectedPath('/robots.txt')).toBe(true);
 		expect(isUnprotectedPath('/sitemap.xml')).toBe(true);
@@ -32,5 +33,7 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/sitemap.xml/extra')).toBe(false);
 		expect(isUnprotectedPath('/manifest.webmanifest/extra')).toBe(false);
 		expect(isUnprotectedPath('/site.webmanifest/extra')).toBe(false);
+		expect(isUnprotectedPath('/_app')).toBe(false);
+		expect(isUnprotectedPath('/_appx/version.json')).toBe(false);
 	});
 });

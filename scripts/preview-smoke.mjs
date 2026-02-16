@@ -167,6 +167,12 @@ async function run() {
 			typeof appVersionBody.version === 'string' && appVersionBody.version.length > 0,
 			'Expected /_app/version.json to expose non-empty version string'
 		);
+		const appPrefixLookalikeResponse = await fetch(`${baseUrl}/_appx/version.json`, {
+			redirect: 'manual'
+		});
+		assertRedirectToLogin(appPrefixLookalikeResponse, 'unauthenticated /_appx/version.json');
+		const appRootResponse = await fetch(`${baseUrl}/_app`, { redirect: 'manual' });
+		assertRedirectToLogin(appRootResponse, 'unauthenticated /_app');
 		const robotsExtraResponse = await fetch(`${baseUrl}/robots.txt/extra`, { redirect: 'manual' });
 		assertRedirectToLogin(robotsExtraResponse, 'unauthenticated /robots.txt/extra');
 		const sitemapExtraResponse = await fetch(`${baseUrl}/sitemap.xml/extra`, { redirect: 'manual' });

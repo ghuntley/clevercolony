@@ -94,7 +94,8 @@ verification, and authenticated session-cookie flow checks using ephemeral test 
 only for the preview process, including post-logout access denial verification across protected
 chat/data APIs and allowlist-boundary regression probes for lookalike routes (for example
 `/api/authz/*`, `/api/healthcheck`, `/robots.txt/extra`), plus a probe that compiled app assets
-remain reachable via `/_app/*` while unauthenticated.
+remain reachable via `/_app/*` while unauthenticated and similarly named non-asset paths
+(for example `/_appx/*`) remain protected.
 
 ## Health endpoint
 
