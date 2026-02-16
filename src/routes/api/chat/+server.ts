@@ -1,7 +1,6 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { isProviderCompatibleWithModel } from '$lib/model-provider';
-import { MAX_TEXT_PROMPT_CHARS, isPromptWithinLimit } from '$lib/request-limits';
 import {
 	addMessage,
 	getConversationById,
@@ -13,31 +12,16 @@ import { getEnv } from '$lib/server/env';
 import { DEFAULT_TEXT_MODEL, getModelById } from '$lib/server/models';
 import { generateTextResponse } from '$lib/server/providers';
 import { createTextSseStream } from '$lib/server/sse';
+import { chatRequestSchema, parseJsonBody } from '$lib/server/validation';
 import { maybeRunWebSearch } from '$lib/server/web-search';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const body = (await event.request.json().catch(() => ({}))) as {
-		conversationId?: string;
-		text?: string;
-		provider?: 'zai' | 'cloudflare-ai';
-		model?: string;
-		webSearchEnabled?: boolean;
-	};
-
-	const conversationId = body.conversationId?.trim();
-	const text = body.text?.trim();
-	if (!conversationId) {
-		throw error(400, 'conversationId is required');
-	}
-	if (!text) {
-		throw error(400, 'text is required');
-	}
-	if (!isPromptWithinLimit(text, MAX_TEXT_PROMPT_CHARS)) {
-		throw error(400, `text exceeds ${MAX_TEXT_PROMPT_CHARS} characters`);
-	}
+	const body = await parseJsonBody(event.request, chatRequestSchema);
+	const conversationId = body.conversationId;
+	const text = body.text;
 	const conversation = await getConversationById(env.DB, conversationId);
 	if (!conversation) {
 		throw error(404, 'Conversation not found');

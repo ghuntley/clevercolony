@@ -1,34 +1,21 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { isProviderCompatibleWithModel } from '$lib/model-provider';
-import { MAX_IMAGE_PROMPT_CHARS, isPromptWithinLimit } from '$lib/request-limits';
 import { addMessage, createImageAsset, getConversationById } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { DEFAULT_IMAGE_MODEL, getModelById } from '$lib/server/models';
 import { generateImage } from '$lib/server/providers';
+import { imageRequestSchema, parseJsonBody } from '$lib/server/validation';
 import { created } from '$lib/server/http';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const body = (await event.request.json().catch(() => ({}))) as {
-		conversationId?: string;
-		prompt?: string;
-		provider?: 'zai' | 'cloudflare-ai';
-		model?: string;
-	};
-	const prompt = body.prompt?.trim();
-	if (!body.conversationId) {
-		throw error(400, 'conversationId is required');
-	}
-	if (!prompt) {
-		throw error(400, 'prompt is required');
-	}
-	if (!isPromptWithinLimit(prompt, MAX_IMAGE_PROMPT_CHARS)) {
-		throw error(400, `prompt exceeds ${MAX_IMAGE_PROMPT_CHARS} characters`);
-	}
-	const conversation = await getConversationById(env.DB, body.conversationId);
+	const body = await parseJsonBody(event.request, imageRequestSchema);
+	const prompt = body.prompt;
+	const conversationId = body.conversationId;
+	const conversation = await getConversationById(env.DB, conversationId);
 	if (!conversation) {
 		throw error(404, 'Conversation not found');
 	}
@@ -51,13 +38,13 @@ export const POST: RequestHandler = async (event) => {
 
 	const imageId = crypto.randomUUID();
 	const messageId = crypto.randomUUID();
-	const storageKey = `images/${body.conversationId}/${imageId}.png`;
+	const storageKey = `images/${conversationId}/${imageId}.png`;
 	await env.MEDIA_BUCKET.put(storageKey, image.bytes, {
 		httpMetadata: {
 			contentType: image.contentType
 		},
 		customMetadata: {
-			conversationId: body.conversationId,
+			conversationId,
 			messageId,
 			provider,
 			model: model.id
@@ -66,7 +53,7 @@ export const POST: RequestHandler = async (event) => {
 
 	await createImageAsset(env.DB, {
 		id: imageId,
-		conversationId: body.conversationId,
+		conversationId,
 		messageId,
 		storageKey,
 		contentType: image.contentType,
@@ -77,7 +64,7 @@ export const POST: RequestHandler = async (event) => {
 
 	const message = await addMessage(env.DB, {
 		id: messageId,
-		conversationId: body.conversationId,
+		conversationId,
 		role: 'assistant',
 		contentType: 'image',
 		content: `Generated image for: ${prompt}`,
@@ -92,7 +79,7 @@ export const POST: RequestHandler = async (event) => {
 	await logAuditEvent({
 		db: env.DB,
 		sessionId: event.locals.sessionId!,
-		conversationId: body.conversationId,
+		conversationId,
 		actionType: 'image.generate',
 		payload: {
 			imageId,
