@@ -1,7 +1,7 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { isProviderCompatibleWithModel } from '$lib/model-provider';
-import { deleteConversation, listMessages, updateConversation } from '$lib/server/db';
+import { deleteConversation, getConversationById, listMessages, updateConversation } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { getModelById } from '$lib/server/models';
 import { parseJsonBody, updateConversationRequestSchema } from '$lib/server/validation';
@@ -15,8 +15,12 @@ export const GET: RequestHandler = async (event) => {
 	if (!conversationId) {
 		throw error(400, 'conversationId is required');
 	}
+	const conversation = await getConversationById(env.DB, conversationId);
+	if (!conversation) {
+		throw error(404, 'Conversation not found');
+	}
 	const messages = await listMessages(env.DB, conversationId);
-	return ok({ conversationId, messages });
+	return ok({ conversationId, conversation, messages });
 };
 
 export const PATCH: RequestHandler = async (event) => {
@@ -73,6 +77,10 @@ export const DELETE: RequestHandler = async (event) => {
 	if (!conversationId) {
 		throw error(400, 'conversationId is required');
 	}
+	const existing = await getConversationById(env.DB, conversationId);
+	if (!existing) {
+		throw error(404, 'Conversation not found');
+	}
 	await deleteConversation(env.DB, conversationId);
 
 	await logAuditEvent({
@@ -80,7 +88,9 @@ export const DELETE: RequestHandler = async (event) => {
 		sessionId: event.locals.sessionId!,
 		conversationId,
 		actionType: 'conversation.delete',
-		payload: {}
+		payload: {
+			title: existing.title
+		}
 	});
 
 	return ok({ deleted: true });
