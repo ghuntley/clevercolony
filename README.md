@@ -104,7 +104,7 @@ Unauthenticated access is intentionally limited to:
 - `/api/auth/*`
 - `/api/health`
 - compiled app assets under `/_app/*`
-- explicit static metadata assets (`/robots.txt`, `/favicon.ico`, `/manifest.webmanifest`, `/site.webmanifest`)
+- metadata/SEO assets (`/robots.txt`, `/sitemap.xml`, `/favicon.ico`, `/manifest.webmanifest`, `/site.webmanifest`)
 
 ## Environment variables
 

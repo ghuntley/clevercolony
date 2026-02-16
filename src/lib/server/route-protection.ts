@@ -1,6 +1,7 @@
 const UNPROTECTED_PATHS = new Set<string>([
 	'/login',
 	'/robots.txt',
+	'/sitemap.xml',
 	'/favicon.ico',
 	'/manifest.webmanifest',
 	'/site.webmanifest'

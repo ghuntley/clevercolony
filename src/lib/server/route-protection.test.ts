@@ -7,6 +7,7 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/_app/immutable/chunk.js')).toBe(true);
 		expect(isUnprotectedPath('/favicon.ico')).toBe(true);
 		expect(isUnprotectedPath('/robots.txt')).toBe(true);
+		expect(isUnprotectedPath('/sitemap.xml')).toBe(true);
 		expect(isUnprotectedPath('/manifest.webmanifest')).toBe(true);
 		expect(isUnprotectedPath('/site.webmanifest')).toBe(true);
 	});
@@ -27,5 +28,6 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/api/healthcheck')).toBe(false);
 		expect(isUnprotectedPath('/favicon-admin')).toBe(false);
 		expect(isUnprotectedPath('/robots.txt/extra')).toBe(false);
+		expect(isUnprotectedPath('/sitemap.xml/extra')).toBe(false);
 	});
 });

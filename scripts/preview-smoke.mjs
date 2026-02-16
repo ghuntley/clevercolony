@@ -100,6 +100,19 @@ async function run() {
 		const location = rootResponse.headers.get('location') ?? '';
 		assert(location.endsWith('/login'), `Expected / redirect location to end with /login, got "${location}"`);
 
+		const sitemapResponse = await fetch(`${baseUrl}/sitemap.xml`);
+		assert(sitemapResponse.status === 200, `Expected /sitemap.xml 200, got ${sitemapResponse.status}`);
+		const sitemapContentType = sitemapResponse.headers.get('content-type') ?? '';
+		assert(
+			sitemapContentType.includes('application/xml'),
+			`Expected /sitemap.xml content-type to include application/xml, got ${sitemapContentType}`
+		);
+		const sitemapBody = await sitemapResponse.text();
+		assert(
+			sitemapBody.includes(`<loc>${baseUrl}/login</loc>`),
+			'Expected /sitemap.xml to contain login URL entry for preview origin'
+		);
+
 		const modelsResponse = await fetch(`${baseUrl}/api/models`, { redirect: 'manual' });
 		assert(
 			modelsResponse.status === 401,
