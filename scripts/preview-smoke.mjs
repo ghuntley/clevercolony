@@ -57,6 +57,15 @@ async function assertBadRequestMessage(response, endpointLabel, expectedMessage)
 	);
 }
 
+function assertRedirectToLogin(response, endpointLabel) {
+	assert(response.status === 303, `Expected ${endpointLabel} to redirect with 303, got ${response.status}`);
+	const location = response.headers.get('location') ?? '';
+	assert(
+		location.endsWith('/login'),
+		`Expected ${endpointLabel} redirect location to end with /login, got "${location}"`
+	);
+}
+
 function toBase64Url(bytes) {
 	return Buffer.from(bytes)
 		.toString('base64')
@@ -147,9 +156,13 @@ async function run() {
 		);
 
 		const rootResponse = await fetch(`${baseUrl}/`, { redirect: 'manual' });
-		assert(rootResponse.status === 303, `Expected / to redirect with 303, got ${rootResponse.status}`);
-		const location = rootResponse.headers.get('location') ?? '';
-		assert(location.endsWith('/login'), `Expected / redirect location to end with /login, got "${location}"`);
+		assertRedirectToLogin(rootResponse, 'unauthenticated /');
+		const robotsExtraResponse = await fetch(`${baseUrl}/robots.txt/extra`, { redirect: 'manual' });
+		assertRedirectToLogin(robotsExtraResponse, 'unauthenticated /robots.txt/extra');
+		const sitemapExtraResponse = await fetch(`${baseUrl}/sitemap.xml/extra`, { redirect: 'manual' });
+		assertRedirectToLogin(sitemapExtraResponse, 'unauthenticated /sitemap.xml/extra');
+		const faviconAdminResponse = await fetch(`${baseUrl}/favicon-admin`, { redirect: 'manual' });
+		assertRedirectToLogin(faviconAdminResponse, 'unauthenticated /favicon-admin');
 
 		const robotsResponse = await fetch(`${baseUrl}/robots.txt`);
 		assert(robotsResponse.status === 200, `Expected /robots.txt 200, got ${robotsResponse.status}`);
@@ -267,6 +280,10 @@ async function run() {
 			unauthenticatedMermaidResponse,
 			'unauthenticated POST /api/tools/mermaid'
 		);
+		const unauthenticatedAuthzResponse = await fetch(`${baseUrl}/api/authz/login`);
+		await assertAuthRequired(unauthenticatedAuthzResponse, 'unauthenticated /api/authz/login');
+		const unauthenticatedHealthcheckResponse = await fetch(`${baseUrl}/api/healthcheck`);
+		await assertAuthRequired(unauthenticatedHealthcheckResponse, 'unauthenticated /api/healthcheck');
 
 		const malformedLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
 			method: 'POST',

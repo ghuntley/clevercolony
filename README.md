@@ -92,7 +92,8 @@ platform bindings emulated via Wrangler local proxy mode. The preview smoke chec
 unauthenticated access guards, sitemap/manifest/robots metadata probes, login failure timing guard
 verification, and authenticated session-cookie flow checks using ephemeral test credentials injected
 only for the preview process, including post-logout access denial verification across protected
-chat/data APIs.
+chat/data APIs and allowlist-boundary regression probes for lookalike routes (for example
+`/api/authz/*`, `/api/healthcheck`, and `/robots.txt/extra`).
 
 ## Health endpoint
 
