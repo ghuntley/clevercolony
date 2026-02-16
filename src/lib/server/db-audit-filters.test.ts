@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { buildAuditFilterWhere } from './audit-query';
 
@@ -57,5 +58,33 @@ describe('buildAuditFilterWhere', () => {
 
 		expect(built.whereClause).toBe(' WHERE action_type = ?1');
 		expect(built.bindings).toEqual(['chat.response']);
+	});
+
+	it('assigns placeholders sequentially when all filters are present', () => {
+		const built = buildAuditFilterWhere({
+			actionType: 'prompt.submit',
+			conversationId: 'conv_123',
+			conversationQuery: 'conv',
+			createdFrom: 111,
+			createdTo: 222
+		});
+
+		expect(built.whereClause).toBe(
+			" WHERE action_type = ?1 AND conversation_id = ?2 AND LOWER(COALESCE(conversation_id, '')) LIKE ?3 ESCAPE '\\' AND created_at >= ?4 AND created_at <= ?5"
+		);
+		expect(built.bindings).toEqual(['prompt.submit', 'conv_123', '%conv%', 111, 222]);
+	});
+
+	it('always escapes wildcard tokens in random conversation query values', () => {
+		fc.assert(
+			fc.property(fc.string({ minLength: 1 }), (query) => {
+				const built = buildAuditFilterWhere({ conversationQuery: query });
+				const expected = `%${query.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`;
+				expect(built.whereClause).toBe(
+					" WHERE LOWER(COALESCE(conversation_id, '')) LIKE ?1 ESCAPE '\\'"
+				);
+				expect(built.bindings).toEqual([expected]);
+			})
+		);
 	});
 });
