@@ -91,6 +91,12 @@ Run deployed smoke probes including authenticated login/logout flow checks:
 SMOKE_BASE_URL="https://your-deployment.example" SMOKE_PASSWORD="your-shared-password" npm run test:deployed
 ```
 
+Optional tuning for slower environments:
+
+```bash
+SMOKE_BASE_URL="https://your-deployment.example" SMOKE_REQUEST_TIMEOUT_MS=30000 npm run test:deployed
+```
+
 ## Continuous integration
 
 GitHub Actions runs three jobs on pushes and pull requests:

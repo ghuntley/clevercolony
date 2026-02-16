@@ -4,6 +4,24 @@ function assert(condition, message) {
 	}
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(url, init, timeoutMs) {
+	const timeoutSignal = AbortSignal.timeout(timeoutMs);
+	const signal = init?.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
+	try {
+		return await fetch(url, {
+			...init,
+			signal
+		});
+	} catch (error) {
+		if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+			throw new Error(`Request to ${url} timed out after ${timeoutMs}ms.`);
+		}
+		throw error;
+	}
+}
+
 async function readJsonSafe(response) {
 	try {
 		return await response.json();
@@ -45,12 +63,19 @@ function parseSetCookieValue(setCookieHeader) {
 }
 
 /**
- * @param {{baseUrl: string; password?: string; cookieSecurityPolicy?: 'skip' | 'secure' | 'insecure'}} options
+ * @param {{
+ *   baseUrl: string;
+ *   password?: string;
+ *   cookieSecurityPolicy?: 'skip' | 'secure' | 'insecure';
+ *   requestTimeoutMs?: number;
+ * }} options
  */
 export async function runSmokeProbes(options) {
 	const cookieSecurityPolicy = options.cookieSecurityPolicy ?? 'skip';
+	const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
 	const baseUrl = options.baseUrl;
 	const password = options.password;
+	const fetch = (url, init) => fetchWithTimeout(url, init, requestTimeoutMs);
 
 	const healthResponse = await fetch(`${baseUrl}/api/health`);
 	assert(healthResponse.status === 200, `Expected /api/health 200, got ${healthResponse.status}`);

@@ -13,14 +13,26 @@ function getBaseUrlFromEnv() {
 	return parsed.toString().replace(/\/$/, '');
 }
 
+function getRequestTimeoutMsFromEnv() {
+	const raw = process.env.SMOKE_REQUEST_TIMEOUT_MS?.trim();
+	if (!raw) return undefined;
+	const parsed = Number(raw);
+	if (!Number.isInteger(parsed) || parsed < 1_000 || parsed > 120_000) {
+		throw new Error('SMOKE_REQUEST_TIMEOUT_MS must be an integer between 1000 and 120000.');
+	}
+	return parsed;
+}
+
 async function run() {
 	const baseUrl = getBaseUrlFromEnv();
 	const password = process.env.SMOKE_PASSWORD?.trim() || undefined;
 	const cookieSecurityPolicy = baseUrl.startsWith('https://') ? 'secure' : 'insecure';
+	const requestTimeoutMs = getRequestTimeoutMsFromEnv();
 	await runSmokeProbes({
 		baseUrl,
 		password,
-		cookieSecurityPolicy
+		cookieSecurityPolicy,
+		requestTimeoutMs
 	});
 	console.log(`Deployed smoke checks passed for ${baseUrl}.`);
 }

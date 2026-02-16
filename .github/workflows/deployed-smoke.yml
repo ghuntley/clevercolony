@@ -12,6 +12,11 @@ on:
         required: false
         default: false
         type: boolean
+      request_timeout_ms:
+        description: 'Per-request timeout in milliseconds for smoke probes'
+        required: false
+        default: '15000'
+        type: string
 
 concurrency:
   group: deployed-smoke-${{ github.ref }}
@@ -37,12 +42,14 @@ jobs:
       - name: Run unauthenticated deployed smoke probes
         env:
           SMOKE_BASE_URL: ${{ inputs.base_url }}
+          SMOKE_REQUEST_TIMEOUT_MS: ${{ inputs.request_timeout_ms }}
         run: npm run test:deployed
 
       - name: Run authenticated deployed smoke probes
         if: ${{ inputs.include_authenticated_checks }}
         env:
           SMOKE_BASE_URL: ${{ inputs.base_url }}
+          SMOKE_REQUEST_TIMEOUT_MS: ${{ inputs.request_timeout_ms }}
           SMOKE_PASSWORD: ${{ secrets.DEPLOYED_SMOKE_PASSWORD }}
         run: |
           if [ -z "$SMOKE_PASSWORD" ]; then
