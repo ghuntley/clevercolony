@@ -80,6 +80,16 @@ For deploy health checks, an unauthenticated endpoint is available:
 
 - `GET /api/health` → `{ status: "ok", timestamp }`
 
+## Auth gate allowlist
+
+Unauthenticated access is intentionally limited to:
+
+- `/login`
+- `/api/auth/*`
+- `/api/health`
+- compiled app assets under `/_app/*`
+- explicit static metadata assets (`/robots.txt`, `/favicon.ico`, `/manifest.webmanifest`, `/site.webmanifest`)
+
 ## Environment variables
 
 Configure these in Cloudflare Pages project settings (and locally through Wrangler where needed):
