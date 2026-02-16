@@ -93,7 +93,8 @@ unauthenticated access guards, sitemap/manifest/robots metadata probes, login fa
 verification, and authenticated session-cookie flow checks using ephemeral test credentials injected
 only for the preview process, including post-logout access denial verification across protected
 chat/data APIs and allowlist-boundary regression probes for lookalike routes (for example
-`/api/authz/*`, `/api/healthcheck`, and `/robots.txt/extra`).
+`/api/authz/*`, `/api/healthcheck`, `/robots.txt/extra`), plus a probe that compiled app assets
+remain reachable via `/_app/*` while unauthenticated.
 
 ## Health endpoint
 

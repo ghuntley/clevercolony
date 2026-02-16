@@ -30,5 +30,7 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/favicon-admin')).toBe(false);
 		expect(isUnprotectedPath('/robots.txt/extra')).toBe(false);
 		expect(isUnprotectedPath('/sitemap.xml/extra')).toBe(false);
+		expect(isUnprotectedPath('/manifest.webmanifest/extra')).toBe(false);
+		expect(isUnprotectedPath('/site.webmanifest/extra')).toBe(false);
 	});
 });

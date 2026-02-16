@@ -157,12 +157,30 @@ async function run() {
 
 		const rootResponse = await fetch(`${baseUrl}/`, { redirect: 'manual' });
 		assertRedirectToLogin(rootResponse, 'unauthenticated /');
+		const appVersionResponse = await fetch(`${baseUrl}/_app/version.json`);
+		assert(
+			appVersionResponse.status === 200,
+			`Expected /_app/version.json 200, got ${appVersionResponse.status}`
+		);
+		const appVersionBody = await readJsonSafe(appVersionResponse);
+		assert(
+			typeof appVersionBody.version === 'string' && appVersionBody.version.length > 0,
+			'Expected /_app/version.json to expose non-empty version string'
+		);
 		const robotsExtraResponse = await fetch(`${baseUrl}/robots.txt/extra`, { redirect: 'manual' });
 		assertRedirectToLogin(robotsExtraResponse, 'unauthenticated /robots.txt/extra');
 		const sitemapExtraResponse = await fetch(`${baseUrl}/sitemap.xml/extra`, { redirect: 'manual' });
 		assertRedirectToLogin(sitemapExtraResponse, 'unauthenticated /sitemap.xml/extra');
 		const faviconAdminResponse = await fetch(`${baseUrl}/favicon-admin`, { redirect: 'manual' });
 		assertRedirectToLogin(faviconAdminResponse, 'unauthenticated /favicon-admin');
+		const manifestExtraResponse = await fetch(`${baseUrl}/manifest.webmanifest/extra`, {
+			redirect: 'manual'
+		});
+		assertRedirectToLogin(manifestExtraResponse, 'unauthenticated /manifest.webmanifest/extra');
+		const siteManifestExtraResponse = await fetch(`${baseUrl}/site.webmanifest/extra`, {
+			redirect: 'manual'
+		});
+		assertRedirectToLogin(siteManifestExtraResponse, 'unauthenticated /site.webmanifest/extra');
 
 		const robotsResponse = await fetch(`${baseUrl}/robots.txt`);
 		assert(robotsResponse.status === 200, `Expected /robots.txt 200, got ${robotsResponse.status}`);
