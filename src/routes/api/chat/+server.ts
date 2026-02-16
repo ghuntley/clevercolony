@@ -1,7 +1,13 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { isProviderCompatibleWithModel } from '$lib/model-provider';
-import { addMessage, listMemories, listMessages, maybeAutoTitleConversationFromMessage } from '$lib/server/db';
+import {
+	addMessage,
+	getConversationById,
+	listMemories,
+	listMessages,
+	maybeAutoTitleConversationFromMessage
+} from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { DEFAULT_TEXT_MODEL, getModelById } from '$lib/server/models';
 import { generateTextResponse } from '$lib/server/providers';
@@ -27,6 +33,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 	if (!text) {
 		throw error(400, 'text is required');
+	}
+	const conversation = await getConversationById(env.DB, conversationId);
+	if (!conversation) {
+		throw error(404, 'Conversation not found');
 	}
 
 	const selectedModelId = body.model ?? DEFAULT_TEXT_MODEL.id;
@@ -78,7 +88,8 @@ export const POST: RequestHandler = async (event) => {
 		payload: {
 			model: selectedModelId,
 			provider,
-			webSearchEnabled: Boolean(body.webSearchEnabled)
+			webSearchEnabled: Boolean(body.webSearchEnabled),
+			conversationTitle: conversation.title
 		},
 		promptText: text
 	});

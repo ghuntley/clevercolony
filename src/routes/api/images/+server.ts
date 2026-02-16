@@ -1,7 +1,7 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { isProviderCompatibleWithModel } from '$lib/model-provider';
-import { addMessage, createImageAsset } from '$lib/server/db';
+import { addMessage, createImageAsset, getConversationById } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { DEFAULT_IMAGE_MODEL, getModelById } from '$lib/server/models';
 import { generateImage } from '$lib/server/providers';
@@ -23,6 +23,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 	if (!prompt) {
 		throw error(400, 'prompt is required');
+	}
+	const conversation = await getConversationById(env.DB, body.conversationId);
+	if (!conversation) {
+		throw error(404, 'Conversation not found');
 	}
 
 	const selectedModelId = body.model ?? DEFAULT_IMAGE_MODEL.id;
@@ -89,7 +93,8 @@ export const POST: RequestHandler = async (event) => {
 		payload: {
 			imageId,
 			model: model.id,
-			provider
+			provider,
+			conversationTitle: conversation.title
 		},
 		promptText: prompt
 	});

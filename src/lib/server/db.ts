@@ -159,6 +159,15 @@ export async function createConversation(
 	};
 }
 
+export async function getConversationById(db: D1Database, conversationId: string): Promise<Conversation | null> {
+	const row = await db
+		.prepare(`SELECT id, title, is_pinned, provider, model, created_at, updated_at FROM conversations WHERE id = ?1`)
+		.bind(conversationId)
+		.first<ConversationRow>();
+	if (!row) return null;
+	return toConversation(row);
+}
+
 export async function updateConversation(
 	db: D1Database,
 	input: {
