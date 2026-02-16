@@ -190,6 +190,7 @@ npm run test:smoke
 - Audit events are append-only by contract and protected by DB triggers.
 - Hash-chain fields (`prev_hash`, `event_hash`) are available for tamper-evidence verification.
 - Audit API supports server-side filtering by `actionType`, `conversationId`/`conversationQuery`, and date window (`dateFrom`, `dateTo`).
+- Date filter parameters use `YYYY-MM-DD` format and are interpreted as UTC day bounds.
 
 ## Keyboard shortcuts
 
