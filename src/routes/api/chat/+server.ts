@@ -1,5 +1,6 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
+import { isProviderCompatibleWithModel } from '$lib/model-provider';
 import { addMessage, listMemories, listMessages, maybeAutoTitleConversationFromMessage } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { DEFAULT_TEXT_MODEL, getModelById } from '$lib/server/models';
@@ -33,7 +34,10 @@ export const POST: RequestHandler = async (event) => {
 	if (!model || model.modality !== 'text') {
 		throw error(400, 'Invalid text model');
 	}
-	const provider = body.provider ?? model.provider;
+	if (!isProviderCompatibleWithModel(body.provider, model.provider)) {
+		throw error(400, 'Provider does not match selected model');
+	}
+	const provider = model.provider;
 
 	const userMessage = await addMessage(env.DB, {
 		id: crypto.randomUUID(),
