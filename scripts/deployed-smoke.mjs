@@ -4,7 +4,7 @@ import { runSmokeProbes } from './smoke-probes.mjs';
 function getBaseUrlFromEnv() {
 	const raw = process.env.SMOKE_BASE_URL?.trim();
 	if (!raw) {
-		throw new Error('SMOKE_BASE_URL is required (example: https://your-pages-domain.example).');
+		throw new Error('SMOKE_BASE_URL is required (example: https://clevercolony.com).');
 	}
 	const parsed = new URL(raw);
 	parsed.pathname = '';

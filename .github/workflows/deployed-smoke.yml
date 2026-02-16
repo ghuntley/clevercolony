@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: 'Target deployment URL (for example https://clever-colony.pages.dev)'
+        description: 'Target deployment URL (for example https://clevercolony.com)'
         required: true
         type: string
       include_authenticated_checks:
