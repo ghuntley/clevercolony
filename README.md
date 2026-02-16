@@ -67,6 +67,13 @@ Run the full release smoke suite (includes Storybook production build):
 npm run test:smoke:full
 ```
 
+## Continuous integration
+
+GitHub Actions runs two jobs on pushes and pull requests:
+
+- `npm run test:smoke` (unit tests + type checks + app build)
+- `npm run build-storybook`
+
 ## Environment variables
 
 Configure these in Cloudflare Pages project settings (and locally through Wrangler where needed):
