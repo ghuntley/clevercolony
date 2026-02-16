@@ -2,11 +2,11 @@
 
 Clever Colony is a Cloudflare Pages + SvelteKit chat application with:
 
-- multi-conversation sidebar (pinning + bulk actions),
+- multi-conversation sidebar (pinning + bulk actions + recency groups + auto-title),
 - model selection across ZAI + Cloudflare Workers AI,
 - image generation with R2 storage,
 - editable memory subsystem backed by D1,
-- optional Serper-powered web search grounding,
+- optional Serper-powered web search grounding (graceful fallback when unavailable),
 - Mermaid diagram rendering,
 - immutable audit trail (append-only + hash-chain).
 
