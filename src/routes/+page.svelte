@@ -27,6 +27,7 @@
 	let editingMemoryId = $state<string | null>(null);
 	let editingMemoryText = $state('');
 	let auditEvents = $state<AuditEvent[]>([]);
+	let auditChainValid = $state<boolean | null>(null);
 	let streamingText = $state('');
 
 	const filteredConversations = $derived(
@@ -224,8 +225,9 @@
 	}
 
 	async function loadAudit() {
-		const data = await fetchJson<{ events: AuditEvent[] }>('/api/audit?limit=100');
+		const data = await fetchJson<{ events: AuditEvent[]; chainValid?: boolean }>('/api/audit?limit=200&verify=1');
 		auditEvents = data.events;
+		auditChainValid = typeof data.chainValid === 'boolean' ? data.chainValid : null;
 	}
 
 	function parseSseFrame(frame: string): { type: string; token?: string; metadata?: Record<string, unknown> } | null {
@@ -637,7 +639,7 @@
 				</ul>
 			</section>
 
-			<AuditTimeline events={auditEvents} />
+			<AuditTimeline events={auditEvents} chainValid={auditChainValid} />
 		</aside>
 	</div>
 {/if}

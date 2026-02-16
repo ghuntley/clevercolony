@@ -47,3 +47,5 @@
 </script>
 
 <Story name="Default" args={{ events: sampleEvents }} />
+<Story name="Chain Verified" args={{ events: sampleEvents, chainValid: true }} />
+<Story name="Chain Mismatch" args={{ events: sampleEvents, chainValid: false }} />

@@ -1,26 +1,73 @@
 <script lang="ts">
 	import type { AuditEvent } from '$lib/types';
+	import { collectAuditActionTypes, filterAuditEvents } from '$lib/audit-filters';
 
 	interface Props {
 		events: AuditEvent[];
+		chainValid?: boolean | null;
 	}
 
-	let { events }: Props = $props();
+	let { events, chainValid = null }: Props = $props();
 	let selected = $state<AuditEvent | null>(null);
+	let actionType = $state('');
+	let conversationQuery = $state('');
+	let dateFrom = $state('');
+	let dateTo = $state('');
 
 	function formatTime(timestamp: number) {
 		return new Date(timestamp).toLocaleString();
 	}
+
+	const actionTypes = $derived(collectAuditActionTypes(events));
+	const filteredEvents = $derived(
+		filterAuditEvents(events, {
+			actionType,
+			conversationQuery,
+			dateFrom,
+			dateTo
+		})
+	);
 </script>
 
 <section class="audit">
 	<header>
 		<h3>Immutable audit trail</h3>
-		<span class="badge">append-only + hash-chain</span>
+		<div class="badges">
+			<span class="badge">append-only + hash-chain</span>
+			{#if chainValid === true}
+				<span class="badge ok">chain verified</span>
+			{:else if chainValid === false}
+				<span class="badge danger">chain mismatch</span>
+			{/if}
+		</div>
 	</header>
 
+	<div class="filters">
+		<label>
+			Action
+			<select bind:value={actionType}>
+				<option value="">All</option>
+				{#each actionTypes as action}
+					<option value={action}>{action}</option>
+				{/each}
+			</select>
+		</label>
+		<label>
+			Conversation
+			<input bind:value={conversationQuery} placeholder="conv id contains..." />
+		</label>
+		<label>
+			From
+			<input bind:value={dateFrom} type="date" />
+		</label>
+		<label>
+			To
+			<input bind:value={dateTo} type="date" />
+		</label>
+	</div>
+
 	<ul>
-		{#each events as event (event.id)}
+		{#each filteredEvents as event (event.id)}
 			<li>
 				<button type="button" class="row" onclick={() => (selected = event)}>
 					<div>
@@ -30,6 +77,8 @@
 					<small>{event.id.slice(0, 8)}…</small>
 				</button>
 			</li>
+		{:else}
+			<li class="empty">No events match current filters.</li>
 		{/each}
 	</ul>
 
@@ -74,10 +123,41 @@ event: {selected.eventHash}</pre
 		align-items: center;
 	}
 
+	.badges {
+		display: inline-flex;
+		gap: 0.35rem;
+		flex-wrap: wrap;
+	}
+
 	.badge {
 		border: 2px solid #7ea97e;
 		padding: 0.2rem 0.4rem;
 		font-size: 0.8rem;
+	}
+
+	.badge.ok {
+		border-color: #7ea97e;
+	}
+
+	.badge.danger {
+		border-color: #d27777;
+	}
+
+	.filters {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.4rem;
+	}
+
+	.filters label {
+		display: grid;
+		gap: 0.2rem;
+		font-size: 0.85rem;
+	}
+
+	.filters input,
+	.filters select {
+		width: 100%;
 	}
 
 	ul {
@@ -101,6 +181,13 @@ event: {selected.eventHash}</pre
 		justify-content: space-between;
 		gap: 0.5rem;
 		cursor: pointer;
+	}
+
+	.empty {
+		border: 2px dashed #555;
+		padding: 0.6rem;
+		color: #a0a0a0;
+		font-size: 0.9rem;
 	}
 
 	p {
@@ -129,5 +216,11 @@ event: {selected.eventHash}</pre
 		border: 2px solid #555;
 		background: #101010;
 		color: inherit;
+	}
+
+	@media (max-width: 800px) {
+		.filters {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
