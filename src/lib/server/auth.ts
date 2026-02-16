@@ -1,6 +1,6 @@
 import { error, redirect, type Cookies, type RequestEvent } from '@sveltejs/kit';
-import { requireEnv } from '$lib/server/env';
-import { signHmac, verifyHmac, verifyPasswordHash } from '$lib/server/crypto';
+import { requireEnv } from './env';
+import { signHmac, verifyHmac, verifyPasswordHash } from './crypto';
 
 const SESSION_COOKIE = 'clever_colony_session';
 
@@ -45,12 +45,22 @@ export async function createSessionCookieValue(secret: string): Promise<{ value:
 	};
 }
 
-export async function setSessionCookie(cookies: Cookies, secret: string): Promise<string> {
+export function shouldUseSecureCookies(requestUrl: URL): boolean {
+	return requestUrl.protocol === 'https:';
+}
+
+export async function setSessionCookie(
+	cookies: Cookies,
+	secret: string,
+	options?: {
+		secure?: boolean;
+	}
+): Promise<string> {
 	const session = await createSessionCookieValue(secret);
 	cookies.set(SESSION_COOKIE, session.value, {
 		path: '/',
 		httpOnly: true,
-		secure: true,
+		secure: options?.secure ?? true,
 		sameSite: 'lax'
 	});
 	return session.sid;

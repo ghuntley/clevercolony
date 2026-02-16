@@ -1,6 +1,11 @@
 import { created } from '$lib/server/http';
 import { getEnv } from '$lib/server/env';
-import { setSessionCookie, requireSessionSecret, validatePasswordAgainstEnv } from '$lib/server/auth';
+import {
+	requireSessionSecret,
+	setSessionCookie,
+	shouldUseSecureCookies,
+	validatePasswordAgainstEnv
+} from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { loginRequestSchema, parseJsonBody } from '$lib/server/validation';
 import { error, type RequestHandler } from '@sveltejs/kit';
@@ -16,7 +21,9 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const secret = requireSessionSecret(env);
-	const sid = await setSessionCookie(event.cookies, secret);
+	const sid = await setSessionCookie(event.cookies, secret, {
+		secure: shouldUseSecureCookies(event.url)
+	});
 	await logAuditEvent({
 		db: env.DB,
 		sessionId: sid,
@@ -27,7 +34,6 @@ export const POST: RequestHandler = async (event) => {
 	});
 
 	return created({
-		authenticated: true,
-		sessionId: sid
+		authenticated: true
 	});
 };
