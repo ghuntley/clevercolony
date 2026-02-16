@@ -48,6 +48,15 @@ async function assertAuthRequired(response, endpointLabel) {
 	);
 }
 
+async function assertBadRequestMessage(response, endpointLabel, expectedMessage) {
+	assert(response.status === 400, `Expected ${endpointLabel} to return 400, got ${response.status}`);
+	const body = await readJsonSafe(response);
+	assert(
+		body.message === expectedMessage,
+		`Expected ${endpointLabel} to return "${expectedMessage}", got "${body.message ?? ''}"`
+	);
+}
+
 function toBase64Url(bytes) {
 	return Buffer.from(bytes)
 		.toString('base64')
@@ -218,14 +227,34 @@ async function run() {
 			headers: { 'content-type': 'application/json' },
 			body: '{'
 		});
-		assert(
-			malformedLoginResponse.status === 400,
-			`Expected malformed /api/auth/login request to return 400, got ${malformedLoginResponse.status}`
+		await assertBadRequestMessage(
+			malformedLoginResponse,
+			'malformed /api/auth/login request',
+			'Invalid JSON body'
 		);
-		const malformedLoginBody = await readJsonSafe(malformedLoginResponse);
-		assert(
-			malformedLoginBody.message === 'Invalid JSON body',
-			'Expected malformed /api/auth/login to return Invalid JSON body'
+		const emptyPasswordResponse = await fetch(`${baseUrl}/api/auth/login`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				password: ''
+			})
+		});
+		await assertBadRequestMessage(
+			emptyPasswordResponse,
+			'/api/auth/login with empty password',
+			'Password is required'
+		);
+		const tooLongPasswordResponse = await fetch(`${baseUrl}/api/auth/login`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				password: 'a'.repeat(257)
+			})
+		});
+		await assertBadRequestMessage(
+			tooLongPasswordResponse,
+			'/api/auth/login with oversized password',
+			'Password is too long'
 		);
 
 		const invalidLoginStartedAt = Date.now();
@@ -250,6 +279,11 @@ async function run() {
 			invalidLoginBody.message === 'Invalid credentials',
 			'Expected invalid /api/auth/login to return Invalid credentials'
 		);
+		const invalidLoginSetCookie = invalidLoginResponse.headers.get('set-cookie') ?? '';
+		assert(
+			!invalidLoginSetCookie.includes('clever_colony_session='),
+			'Expected invalid /api/auth/login response to avoid setting session cookie'
+		);
 
 		const validLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
 			method: 'POST',
@@ -261,6 +295,10 @@ async function run() {
 		assert(validLoginResponse.status === 201, `Expected /api/auth/login 201, got ${validLoginResponse.status}`);
 		const validLoginBody = await readJsonSafe(validLoginResponse);
 		assert(validLoginBody.authenticated === true, 'Expected /api/auth/login to return authenticated=true');
+		assert(
+			!Object.prototype.hasOwnProperty.call(validLoginBody, 'sessionId'),
+			'Expected /api/auth/login response to avoid exposing sessionId'
+		);
 		const setCookie = validLoginResponse.headers.get('set-cookie') ?? '';
 		assert(
 			setCookie.includes('clever_colony_session='),
