@@ -9,6 +9,7 @@ import {
 	memoryDeleteQuerySchema,
 	memoryListQuerySchema,
 	parseJsonBody,
+	parsePathParam,
 	parseSearchParams,
 	updateConversationRequestSchema,
 	updateMemoryRequestSchema,
@@ -178,5 +179,15 @@ describe('parseSearchParams', () => {
 
 	it('requires memory id in delete query', () => {
 		expect(() => parseSearchParams(new URLSearchParams(), memoryDeleteQuerySchema)).toThrow();
+	});
+});
+
+describe('parsePathParam', () => {
+	it('returns valid path parameter values', () => {
+		expect(parsePathParam('  convo_123  ', 'conversationId')).toBe('convo_123');
+	});
+
+	it('throws on missing values', () => {
+		expect(() => parsePathParam(undefined, 'imageId')).toThrow();
 	});
 });

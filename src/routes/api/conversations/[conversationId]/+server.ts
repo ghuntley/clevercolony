@@ -4,17 +4,14 @@ import { isProviderCompatibleWithModel } from '$lib/model-provider';
 import { deleteConversation, getConversationById, listMessages, updateConversation } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { getModelById } from '$lib/server/models';
-import { parseJsonBody, updateConversationRequestSchema } from '$lib/server/validation';
+import { parseJsonBody, parsePathParam, updateConversationRequestSchema } from '$lib/server/validation';
 import { ok } from '$lib/server/http';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const conversationId = event.params.conversationId;
-	if (!conversationId) {
-		throw error(400, 'conversationId is required');
-	}
+	const conversationId = parsePathParam(event.params.conversationId, 'conversationId');
 	const conversation = await getConversationById(env.DB, conversationId);
 	if (!conversation) {
 		throw error(404, 'Conversation not found');
@@ -26,10 +23,7 @@ export const GET: RequestHandler = async (event) => {
 export const PATCH: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const conversationId = event.params.conversationId;
-	if (!conversationId) {
-		throw error(400, 'conversationId is required');
-	}
+	const conversationId = parsePathParam(event.params.conversationId, 'conversationId');
 	const body = await parseJsonBody(event.request, updateConversationRequestSchema);
 	let nextModel = body.model;
 	let nextProvider = body.provider;
@@ -73,10 +67,7 @@ export const PATCH: RequestHandler = async (event) => {
 export const DELETE: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const conversationId = event.params.conversationId;
-	if (!conversationId) {
-		throw error(400, 'conversationId is required');
-	}
+	const conversationId = parsePathParam(event.params.conversationId, 'conversationId');
 	const existing = await getConversationById(env.DB, conversationId);
 	if (!existing) {
 		throw error(404, 'Conversation not found');

@@ -1,15 +1,13 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { getImageAsset } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
+import { parsePathParam } from '$lib/server/validation';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const imageId = event.params.imageId;
-	if (!imageId) {
-		throw error(400, 'imageId is required');
-	}
+	const imageId = parsePathParam(event.params.imageId, 'imageId');
 	const asset = await getImageAsset(env.DB, imageId);
 	if (!asset) {
 		throw error(404, 'Image not found');

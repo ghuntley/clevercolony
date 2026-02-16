@@ -18,6 +18,7 @@ const memoryContentSchema = z
 	.max(4000, 'Memory content is too long');
 const optionalConversationIdSchema = z.string().trim().min(1, 'conversationId cannot be empty').max(128).nullable().optional();
 const resourceIdSchema = z.string().trim().min(1, 'id is required').max(128, 'id is too long');
+const pathParamValueSchema = z.string().trim().min(1).max(128, 'path parameter is too long');
 
 export const chatRequestSchema = z.object({
 	conversationId: conversationIdSchema,
@@ -167,6 +168,17 @@ export function parseSearchParams<TSchema extends z.ZodTypeAny>(
 	const parsed = schema.safeParse(values);
 	if (!parsed.success) {
 		throw error(400, parsed.error.issues[0]?.message ?? 'Invalid query parameters');
+	}
+	return parsed.data;
+}
+
+export function parsePathParam(value: string | undefined, paramName: string): string {
+	const parsed = pathParamValueSchema.safeParse(value);
+	if (!parsed.success) {
+		if (value === undefined) {
+			throw error(400, `${paramName} is required`);
+		}
+		throw error(400, parsed.error.issues[0]?.message ?? `Invalid ${paramName}`);
 	}
 	return parsed.data;
 }
