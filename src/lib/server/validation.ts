@@ -131,7 +131,20 @@ export const auditQuerySchema = z.object({
 	offset: numberParam(0, 0, 100_000, 'offset'),
 	actionType: z.string().trim().min(1, 'actionType cannot be empty').max(120, 'actionType is too long').optional(),
 	conversationId: z.string().trim().min(1, 'conversationId cannot be empty').max(128, 'conversationId is too long').optional(),
+	conversationQuery: z
+		.string()
+		.trim()
+		.min(1, 'conversationQuery cannot be empty')
+		.max(128, 'conversationQuery is too long')
+		.optional(),
+	dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateFrom must be YYYY-MM-DD').optional(),
+	dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateTo must be YYYY-MM-DD').optional(),
 	verify: z.preprocess((value) => value === '1', z.boolean())
+}).refine((input) => {
+	if (!input.dateFrom || !input.dateTo) return true;
+	return input.dateFrom <= input.dateTo;
+}, {
+	message: 'dateFrom must be before or equal to dateTo'
 });
 
 export const memoryListQuerySchema = z.object({

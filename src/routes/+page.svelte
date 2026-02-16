@@ -11,6 +11,12 @@
 
 	type Mode = 'chat' | 'image';
 	type Theme = 'dark' | 'light';
+	type AuditFilterState = {
+		actionType: string;
+		conversationQuery: string;
+		dateFrom: string;
+		dateTo: string;
+	};
 	const AUDIT_PAGE_SIZE = 100;
 
 	let loading = $state(true);
@@ -37,6 +43,10 @@
 	let auditHasMore = $state(false);
 	let auditTotalCount = $state(0);
 	let auditLoading = $state(false);
+	let auditActionType = $state('');
+	let auditConversationQuery = $state('');
+	let auditDateFrom = $state('');
+	let auditDateTo = $state('');
 	let streamingText = $state('');
 	let messagesContainer = $state<HTMLElement | null>(null);
 	let sidebarOpen = $state(false);
@@ -285,13 +295,22 @@
 		if (auditLoading) return;
 		auditLoading = true;
 		const offset = reset ? 0 : auditOffset;
+		const params = new URLSearchParams({
+			limit: String(AUDIT_PAGE_SIZE),
+			offset: String(offset),
+			verify: reset ? '1' : '0'
+		});
+		if (auditActionType) params.set('actionType', auditActionType);
+		if (auditConversationQuery) params.set('conversationQuery', auditConversationQuery);
+		if (auditDateFrom) params.set('dateFrom', auditDateFrom);
+		if (auditDateTo) params.set('dateTo', auditDateTo);
 		try {
 			const data = await fetchJson<{
 				events: AuditEvent[];
 				chainValid?: boolean;
 				hasMore?: boolean;
 				totalCount?: number;
-			}>(`/api/audit?limit=${AUDIT_PAGE_SIZE}&offset=${offset}&verify=${reset ? 1 : 0}`);
+			}>(`/api/audit?${params.toString()}`);
 			auditEvents = reset ? data.events : [...auditEvents, ...data.events];
 			auditOffset = offset + data.events.length;
 			auditHasMore = Boolean(data.hasMore);
@@ -304,6 +323,20 @@
 		} finally {
 			auditLoading = false;
 		}
+	}
+
+	function handleAuditFilterChange(next: AuditFilterState) {
+		const changed =
+			auditActionType !== next.actionType ||
+			auditConversationQuery !== next.conversationQuery ||
+			auditDateFrom !== next.dateFrom ||
+			auditDateTo !== next.dateTo;
+		if (!changed) return;
+		auditActionType = next.actionType;
+		auditConversationQuery = next.conversationQuery;
+		auditDateFrom = next.dateFrom;
+		auditDateTo = next.dateTo;
+		void loadAudit({ reset: true });
 	}
 
 	function parseSseFrame(frame: string): { type: string; token?: string; metadata?: Record<string, unknown> } | null {
@@ -811,7 +844,17 @@
 				</ul>
 			</section>
 
-			<AuditTimeline events={auditEvents} chainValid={auditChainValid} />
+			<AuditTimeline
+				events={auditEvents}
+				chainValid={auditChainValid}
+				filters={{
+					actionType: auditActionType,
+					conversationQuery: auditConversationQuery,
+					dateFrom: auditDateFrom,
+					dateTo: auditDateTo
+				}}
+				onFilterChange={handleAuditFilterChange}
+			/>
 			<div class="audit-controls">
 				<p class="audit-count">Loaded {auditEvents.length}{auditTotalCount ? ` / ${auditTotalCount}` : ''} events</p>
 				<button type="button" onclick={() => loadAudit({ reset: true })} disabled={auditLoading}>

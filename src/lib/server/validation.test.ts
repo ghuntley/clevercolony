@@ -157,6 +157,18 @@ describe('parseSearchParams', () => {
 		});
 	});
 
+	it('rejects audit date ranges where from > to', () => {
+		expect(() =>
+			parseSearchParams(
+				new URLSearchParams([
+					['dateFrom', '2026-02-10'],
+					['dateTo', '2026-02-01']
+				]),
+				auditQuerySchema
+			)
+		).toThrow();
+	});
+
 	it('rejects invalid audit pagination params', () => {
 		expect(() => parseSearchParams(new URLSearchParams([['limit', '0']]), auditQuerySchema)).toThrow();
 		try {

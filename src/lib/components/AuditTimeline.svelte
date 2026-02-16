@@ -1,32 +1,64 @@
 <script lang="ts">
 	import type { AuditEvent } from '$lib/types';
-	import { collectAuditActionTypes, filterAuditEvents } from '$lib/audit-filters';
+
+	export interface AuditFilterState {
+		actionType: string;
+		conversationQuery: string;
+		dateFrom: string;
+		dateTo: string;
+	}
 
 	interface Props {
 		events: AuditEvent[];
 		chainValid?: boolean | null;
+		filters?: AuditFilterState;
+		onFilterChange?: (filters: AuditFilterState) => void;
 	}
 
-	let { events, chainValid = null }: Props = $props();
+	let {
+		events,
+		chainValid = null,
+		filters = { actionType: '', conversationQuery: '', dateFrom: '', dateTo: '' },
+		onFilterChange
+	}: Props = $props();
 	let selected = $state<AuditEvent | null>(null);
-	let actionType = $state('');
-	let conversationQuery = $state('');
-	let dateFrom = $state('');
-	let dateTo = $state('');
+	let actionType = $state(filters.actionType);
+	let conversationQuery = $state(filters.conversationQuery);
+	let dateFrom = $state(filters.dateFrom);
+	let dateTo = $state(filters.dateTo);
+	let filterDebounce: ReturnType<typeof setTimeout> | null = null;
 
 	function formatTime(timestamp: number) {
 		return new Date(timestamp).toLocaleString();
 	}
 
-	const actionTypes = $derived(collectAuditActionTypes(events));
-	const filteredEvents = $derived(
-		filterAuditEvents(events, {
+	const actionTypes = $derived(
+		[...new Set(events.map((event) => event.actionType))].sort((left, right) =>
+			left.localeCompare(right)
+		)
+	);
+
+	$effect(() => {
+		const next = {
 			actionType,
 			conversationQuery,
 			dateFrom,
 			dateTo
-		})
-	);
+		} satisfies AuditFilterState;
+		if (!onFilterChange) return;
+		if (filterDebounce) {
+			clearTimeout(filterDebounce);
+		}
+		filterDebounce = setTimeout(() => {
+			onFilterChange(next);
+		}, 180);
+		return () => {
+			if (filterDebounce) {
+				clearTimeout(filterDebounce);
+				filterDebounce = null;
+			}
+		};
+	});
 </script>
 
 <section class="audit">
@@ -67,7 +99,7 @@
 	</div>
 
 	<ul>
-		{#each filteredEvents as event (event.id)}
+		{#each events as event (event.id)}
 			<li>
 				<button type="button" class="row" onclick={() => (selected = event)}>
 					<div>
@@ -78,7 +110,7 @@
 				</button>
 			</li>
 		{:else}
-			<li class="empty">No events match current filters.</li>
+			<li class="empty">No events match current server filters.</li>
 		{/each}
 	</ul>
 

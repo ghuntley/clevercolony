@@ -491,6 +491,42 @@ export async function getImageAsset(db: D1Database, imageId: string): Promise<Im
 	return row ?? null;
 }
 
+function buildAuditFilterWhere(options: {
+	actionType?: string | null;
+	conversationId?: string | null;
+	conversationQuery?: string | null;
+	createdFrom?: number | null;
+	createdTo?: number | null;
+}) {
+	const clauses: string[] = [];
+	const bindings: Array<string | number> = [];
+	const bindValue = (value: string | number) => {
+		bindings.push(value);
+		return `?${bindings.length}`;
+	};
+
+	if (options.actionType) {
+		clauses.push(`action_type = ${bindValue(options.actionType)}`);
+	}
+	if (options.conversationId) {
+		clauses.push(`conversation_id = ${bindValue(options.conversationId)}`);
+	}
+	if (options.conversationQuery) {
+		clauses.push(`LOWER(COALESCE(conversation_id, '')) LIKE ${bindValue(`%${options.conversationQuery.toLowerCase()}%`)}`);
+	}
+	if (options.createdFrom !== null && options.createdFrom !== undefined) {
+		clauses.push(`created_at >= ${bindValue(options.createdFrom)}`);
+	}
+	if (options.createdTo !== null && options.createdTo !== undefined) {
+		clauses.push(`created_at <= ${bindValue(options.createdTo)}`);
+	}
+
+	return {
+		whereClause: clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '',
+		bindings
+	};
+}
+
 export async function listAuditEvents(
 	db: D1Database,
 	options: {
@@ -498,61 +534,25 @@ export async function listAuditEvents(
 		offset?: number;
 		actionType?: string | null;
 		conversationId?: string | null;
+		conversationQuery?: string | null;
+		createdFrom?: number | null;
+		createdTo?: number | null;
 	}
 ): Promise<AuditEvent[]> {
 	const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
 	const offset = Math.max(options.offset ?? 0, 0);
-
-	if (options.actionType && options.conversationId) {
-		const result = await db
-			.prepare(
-				`SELECT id, created_at, actor_session_id, conversation_id, action_type, payload_json, prompt_text, prev_hash, event_hash
-         FROM audit_events
-         WHERE action_type = ?1 AND conversation_id = ?2
-         ORDER BY created_at DESC
-         LIMIT ?3 OFFSET ?4`
-			)
-			.bind(options.actionType, options.conversationId, limit, offset)
-			.all<AuditEventRow>();
-		return (result.results ?? []).map(toAuditEvent);
-	}
-
-	if (options.actionType) {
-		const result = await db
-			.prepare(
-				`SELECT id, created_at, actor_session_id, conversation_id, action_type, payload_json, prompt_text, prev_hash, event_hash
-         FROM audit_events
-         WHERE action_type = ?1
-         ORDER BY created_at DESC
-         LIMIT ?2 OFFSET ?3`
-			)
-			.bind(options.actionType, limit, offset)
-			.all<AuditEventRow>();
-		return (result.results ?? []).map(toAuditEvent);
-	}
-
-	if (options.conversationId) {
-		const result = await db
-			.prepare(
-				`SELECT id, created_at, actor_session_id, conversation_id, action_type, payload_json, prompt_text, prev_hash, event_hash
-         FROM audit_events
-         WHERE conversation_id = ?1
-         ORDER BY created_at DESC
-         LIMIT ?2 OFFSET ?3`
-			)
-			.bind(options.conversationId, limit, offset)
-			.all<AuditEventRow>();
-		return (result.results ?? []).map(toAuditEvent);
-	}
+	const { whereClause, bindings } = buildAuditFilterWhere(options);
+	const limitPlaceholder = `?${bindings.length + 1}`;
+	const offsetPlaceholder = `?${bindings.length + 2}`;
 
 	const result = await db
 		.prepare(
 			`SELECT id, created_at, actor_session_id, conversation_id, action_type, payload_json, prompt_text, prev_hash, event_hash
-       FROM audit_events
+       FROM audit_events${whereClause}
        ORDER BY created_at DESC
-       LIMIT ?1 OFFSET ?2`
+       LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`
 		)
-		.bind(limit, offset)
+		.bind(...bindings, limit, offset)
 		.all<AuditEventRow>();
 	return (result.results ?? []).map(toAuditEvent);
 }
@@ -562,33 +562,16 @@ export async function countAuditEvents(
 	options: {
 		actionType?: string | null;
 		conversationId?: string | null;
+		conversationQuery?: string | null;
+		createdFrom?: number | null;
+		createdTo?: number | null;
 	}
 ): Promise<number> {
-	if (options.actionType && options.conversationId) {
-		const row = await db
-			.prepare(`SELECT COUNT(*) AS total FROM audit_events WHERE action_type = ?1 AND conversation_id = ?2`)
-			.bind(options.actionType, options.conversationId)
-			.first<{ total: number }>();
-		return Number(row?.total ?? 0);
-	}
-
-	if (options.actionType) {
-		const row = await db
-			.prepare(`SELECT COUNT(*) AS total FROM audit_events WHERE action_type = ?1`)
-			.bind(options.actionType)
-			.first<{ total: number }>();
-		return Number(row?.total ?? 0);
-	}
-
-	if (options.conversationId) {
-		const row = await db
-			.prepare(`SELECT COUNT(*) AS total FROM audit_events WHERE conversation_id = ?1`)
-			.bind(options.conversationId)
-			.first<{ total: number }>();
-		return Number(row?.total ?? 0);
-	}
-
-	const row = await db.prepare(`SELECT COUNT(*) AS total FROM audit_events`).first<{ total: number }>();
+	const { whereClause, bindings } = buildAuditFilterWhere(options);
+	const row = await db
+		.prepare(`SELECT COUNT(*) AS total FROM audit_events${whereClause}`)
+		.bind(...bindings)
+		.first<{ total: number }>();
 	return Number(row?.total ?? 0);
 }
 
