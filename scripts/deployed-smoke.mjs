@@ -32,7 +32,8 @@ async function run() {
 		baseUrl,
 		password,
 		cookieSecurityPolicy,
-		requestTimeoutMs
+		requestTimeoutMs,
+		includeCredentialChecks: Boolean(password)
 	});
 	console.log(`Deployed smoke checks passed for ${baseUrl}.`);
 }

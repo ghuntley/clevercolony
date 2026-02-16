@@ -1,30 +1,7 @@
-import { spawn } from 'node:child_process';
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
-import { createServer } from 'node:net';
 import process from 'node:process';
-import { setTimeout as delay } from 'node:timers/promises';
+import { startPreviewServer, stopPreviewServer } from './preview-runtime.mjs';
 import { runSmokeProbes } from './smoke-probes.mjs';
-
-async function findAvailablePort() {
-	const server = createServer();
-	await new Promise((resolve, reject) => {
-		server.once('error', reject);
-		server.listen(0, '127.0.0.1', resolve);
-	});
-	const address = server.address();
-	if (!address || typeof address === 'string') {
-		server.close();
-		throw new Error('Unable to determine available local port for preview smoke checks.');
-	}
-	const port = address.port;
-	await new Promise((resolve, reject) => {
-		server.close((error) => {
-			if (error) reject(error);
-			else resolve();
-		});
-	});
-	return port;
-}
 
 function toBase64Url(bytes) {
 	return Buffer.from(bytes)
@@ -40,69 +17,27 @@ function buildPasswordHash(password, iterations = 210_000) {
 	return `pbkdf2_sha256$${iterations}$${toBase64Url(salt)}$${toBase64Url(digest)}`;
 }
 
-async function waitForPreviewServer(child, baseUrl) {
-	for (let attempt = 0; attempt < 40; attempt += 1) {
-		if (child.exitCode !== null) {
-			throw new Error(`Preview server exited unexpectedly with code ${child.exitCode}`);
-		}
-
-		try {
-			const response = await fetch(`${baseUrl}/api/health`);
-			if (response.ok) {
-				return;
-			}
-		} catch {
-			// retry
-		}
-
-		await delay(500);
-	}
-
-	throw new Error('Timed out waiting for preview server to accept requests.');
-}
-
-async function stopPreviewServer(child) {
-	if (child.exitCode !== null) return;
-
-	child.kill('SIGTERM');
-	await Promise.race([
-		new Promise((resolve) => child.once('exit', resolve)),
-		delay(5000)
-	]);
-
-	if (child.exitCode === null) {
-		child.kill('SIGKILL');
-		await new Promise((resolve) => child.once('exit', resolve));
-	}
-}
-
 async function run() {
-	const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-	const previewPort = await findAvailablePort();
-	const baseUrl = `http://127.0.0.1:${previewPort}`;
 	const testPassword = 'preview-smoke-password';
 	const testPasswordHash = buildPasswordHash(testPassword);
 	const sessionSecret = 'preview-smoke-session-secret';
-	const preview = spawn(npmCommand, ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(previewPort)], {
-		stdio: 'inherit',
-		env: {
-			...process.env,
-			CI: '1',
+	const preview = await startPreviewServer({
+		extraEnv: {
 			APP_ACCESS_PASSWORD_HASH: testPasswordHash,
 			APP_SESSION_SECRET: sessionSecret
 		}
 	});
 
 	try {
-		await waitForPreviewServer(preview, baseUrl);
 		await runSmokeProbes({
-			baseUrl,
+			baseUrl: preview.baseUrl,
 			password: testPassword,
-			cookieSecurityPolicy: 'insecure'
+			cookieSecurityPolicy: 'insecure',
+			includeCredentialChecks: true
 		});
 		console.log('Preview smoke checks passed.');
 	} finally {
-		await stopPreviewServer(preview);
+		await stopPreviewServer(preview.child);
 	}
 }
 

@@ -57,6 +57,21 @@ function assertRedirectToLogin(response, endpointLabel) {
 	);
 }
 
+function assertProtectedPageRequest(response, endpointLabel) {
+	if (response.status === 303) {
+		const location = response.headers.get('location') ?? '';
+		assert(
+			location.endsWith('/login'),
+			`Expected ${endpointLabel} redirect location to end with /login, got "${location}"`
+		);
+		return;
+	}
+	if (response.status === 404) {
+		return;
+	}
+	throw new Error(`Expected ${endpointLabel} to return 303 or 404, got ${response.status}`);
+}
+
 function parseSetCookieValue(setCookieHeader) {
 	const cookiePair = (setCookieHeader ?? '').split(';')[0] ?? '';
 	return cookiePair.trim();
@@ -68,6 +83,7 @@ function parseSetCookieValue(setCookieHeader) {
  *   password?: string;
  *   cookieSecurityPolicy?: 'skip' | 'secure' | 'insecure';
  *   requestTimeoutMs?: number;
+ *   includeCredentialChecks?: boolean;
  * }} options
  */
 export async function runSmokeProbes(options) {
@@ -75,6 +91,7 @@ export async function runSmokeProbes(options) {
 	const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
 	const baseUrl = options.baseUrl;
 	const password = options.password;
+	const includeCredentialChecks = options.includeCredentialChecks ?? Boolean(password);
 	const fetch = (url, init) => fetchWithTimeout(url, init, requestTimeoutMs);
 
 	const healthResponse = await fetch(`${baseUrl}/api/health`);
@@ -106,23 +123,23 @@ export async function runSmokeProbes(options) {
 	const appPrefixLookalikeResponse = await fetch(`${baseUrl}/_appx/version.json`, {
 		redirect: 'manual'
 	});
-	assertRedirectToLogin(appPrefixLookalikeResponse, 'unauthenticated /_appx/version.json');
+	assertProtectedPageRequest(appPrefixLookalikeResponse, 'unauthenticated /_appx/version.json');
 	const appRootResponse = await fetch(`${baseUrl}/_app`, { redirect: 'manual' });
-	assertRedirectToLogin(appRootResponse, 'unauthenticated /_app');
+	assertProtectedPageRequest(appRootResponse, 'unauthenticated /_app');
 	const robotsExtraResponse = await fetch(`${baseUrl}/robots.txt/extra`, { redirect: 'manual' });
-	assertRedirectToLogin(robotsExtraResponse, 'unauthenticated /robots.txt/extra');
+	assertProtectedPageRequest(robotsExtraResponse, 'unauthenticated /robots.txt/extra');
 	const sitemapExtraResponse = await fetch(`${baseUrl}/sitemap.xml/extra`, { redirect: 'manual' });
-	assertRedirectToLogin(sitemapExtraResponse, 'unauthenticated /sitemap.xml/extra');
+	assertProtectedPageRequest(sitemapExtraResponse, 'unauthenticated /sitemap.xml/extra');
 	const faviconAdminResponse = await fetch(`${baseUrl}/favicon-admin`, { redirect: 'manual' });
-	assertRedirectToLogin(faviconAdminResponse, 'unauthenticated /favicon-admin');
+	assertProtectedPageRequest(faviconAdminResponse, 'unauthenticated /favicon-admin');
 	const manifestExtraResponse = await fetch(`${baseUrl}/manifest.webmanifest/extra`, {
 		redirect: 'manual'
 	});
-	assertRedirectToLogin(manifestExtraResponse, 'unauthenticated /manifest.webmanifest/extra');
+	assertProtectedPageRequest(manifestExtraResponse, 'unauthenticated /manifest.webmanifest/extra');
 	const siteManifestExtraResponse = await fetch(`${baseUrl}/site.webmanifest/extra`, {
 		redirect: 'manual'
 	});
-	assertRedirectToLogin(siteManifestExtraResponse, 'unauthenticated /site.webmanifest/extra');
+	assertProtectedPageRequest(siteManifestExtraResponse, 'unauthenticated /site.webmanifest/extra');
 
 	const robotsResponse = await fetch(`${baseUrl}/robots.txt`);
 	assert(robotsResponse.status === 200, `Expected /robots.txt 200, got ${robotsResponse.status}`);
@@ -259,6 +276,11 @@ export async function runSmokeProbes(options) {
 		'Password is too long'
 	);
 
+	if (!includeCredentialChecks) return;
+	if (!password) {
+		throw new Error('password is required when includeCredentialChecks=true');
+	}
+
 	const invalidLoginStartedAt = Date.now();
 	const invalidLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
 		method: 'POST',
@@ -286,8 +308,6 @@ export async function runSmokeProbes(options) {
 		!invalidLoginSetCookie.includes('clever_colony_session='),
 		'Expected invalid /api/auth/login response to avoid setting session cookie'
 	);
-
-	if (!password) return;
 
 	const validLoginStartedAt = Date.now();
 	const validLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {

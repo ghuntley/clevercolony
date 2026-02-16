@@ -85,6 +85,9 @@ Run deployed smoke probes against a live URL (unauthenticated checks only):
 SMOKE_BASE_URL="https://your-deployment.example" npm run test:deployed
 ```
 
+When `SMOKE_PASSWORD` is omitted, deployed smoke skips credential-dependent login/logout assertions
+and focuses on public/auth-boundary route probes.
+
 Run deployed smoke probes including authenticated login/logout flow checks:
 
 ```bash
@@ -96,6 +99,15 @@ Optional tuning for slower environments:
 ```bash
 SMOKE_BASE_URL="https://your-deployment.example" SMOKE_REQUEST_TIMEOUT_MS=30000 npm run test:deployed
 ```
+
+Run the deployed-smoke runner locally against an ephemeral preview server:
+
+```bash
+npm run test:deployed:local
+```
+
+This local helper runs the deployed probe contract in **unauthenticated mode** (no `SMOKE_PASSWORD`),
+which is useful for quickly validating routing/auth boundaries before testing against a live URL.
 
 ## Continuous integration
 
