@@ -1,9 +1,28 @@
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const BASE_URL = 'http://127.0.0.1:4173';
-const PREVIEW_ARGS = ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'];
+async function findAvailablePort() {
+	const server = createServer();
+	await new Promise((resolve, reject) => {
+		server.once('error', reject);
+		server.listen(0, '127.0.0.1', resolve);
+	});
+	const address = server.address();
+	if (!address || typeof address === 'string') {
+		server.close();
+		throw new Error('Unable to determine available local port for preview smoke checks.');
+	}
+	const port = address.port;
+	await new Promise((resolve, reject) => {
+		server.close((error) => {
+			if (error) reject(error);
+			else resolve();
+		});
+	});
+	return port;
+}
 
 function assert(condition, message) {
 	if (!condition) {
@@ -11,14 +30,22 @@ function assert(condition, message) {
 	}
 }
 
-async function waitForPreviewServer(child) {
+async function readJsonSafe(response) {
+	try {
+		return await response.json();
+	} catch {
+		return {};
+	}
+}
+
+async function waitForPreviewServer(child, baseUrl) {
 	for (let attempt = 0; attempt < 40; attempt += 1) {
 		if (child.exitCode !== null) {
 			throw new Error(`Preview server exited unexpectedly with code ${child.exitCode}`);
 		}
 
 		try {
-			const response = await fetch(`${BASE_URL}/api/health`);
+			const response = await fetch(`${baseUrl}/api/health`);
 			if (response.ok) {
 				return;
 			}
@@ -49,15 +76,17 @@ async function stopPreviewServer(child) {
 
 async function run() {
 	const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-	const preview = spawn(npmCommand, PREVIEW_ARGS, {
+	const previewPort = await findAvailablePort();
+	const baseUrl = `http://127.0.0.1:${previewPort}`;
+	const preview = spawn(npmCommand, ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(previewPort)], {
 		stdio: 'inherit',
 		env: { ...process.env, CI: '1' }
 	});
 
 	try {
-		await waitForPreviewServer(preview);
+		await waitForPreviewServer(preview, baseUrl);
 
-		const healthResponse = await fetch(`${BASE_URL}/api/health`);
+		const healthResponse = await fetch(`${baseUrl}/api/health`);
 		assert(healthResponse.status === 200, `Expected /api/health 200, got ${healthResponse.status}`);
 		const healthBody = await healthResponse.json();
 		assert(healthBody.status === 'ok', 'Expected /api/health payload status=ok');
@@ -66,16 +95,41 @@ async function run() {
 			'Expected /api/health payload to include numeric timestamp'
 		);
 
-		const rootResponse = await fetch(`${BASE_URL}/`, { redirect: 'manual' });
+		const rootResponse = await fetch(`${baseUrl}/`, { redirect: 'manual' });
 		assert(rootResponse.status === 303, `Expected / to redirect with 303, got ${rootResponse.status}`);
 		const location = rootResponse.headers.get('location') ?? '';
 		assert(location.endsWith('/login'), `Expected / redirect location to end with /login, got "${location}"`);
 
-		const modelsResponse = await fetch(`${BASE_URL}/api/models`, { redirect: 'manual' });
+		const modelsResponse = await fetch(`${baseUrl}/api/models`, { redirect: 'manual' });
 		assert(
 			modelsResponse.status === 401,
 			`Expected unauthenticated /api/models to return 401, got ${modelsResponse.status}`
 		);
+		const modelsBody = await readJsonSafe(modelsResponse);
+		assert(
+			modelsBody.error === 'Authentication required',
+			`Expected /api/models 401 payload to include Authentication required message`
+		);
+
+		const malformedLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: '{'
+		});
+		assert(
+			malformedLoginResponse.status === 400,
+			`Expected malformed /api/auth/login request to return 400, got ${malformedLoginResponse.status}`
+		);
+		const malformedLoginBody = await readJsonSafe(malformedLoginResponse);
+		assert(
+			malformedLoginBody.message === 'Invalid JSON body',
+			'Expected malformed /api/auth/login to return Invalid JSON body'
+		);
+
+		const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST' });
+		assert(logoutResponse.status === 200, `Expected /api/auth/logout 200, got ${logoutResponse.status}`);
+		const logoutBody = await readJsonSafe(logoutResponse);
+		assert(logoutBody.authenticated === false, 'Expected /api/auth/logout to return authenticated=false');
 
 		console.log('Preview smoke checks passed.');
 	} finally {
