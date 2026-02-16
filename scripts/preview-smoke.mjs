@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
 import process from 'node:process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -36,6 +37,25 @@ async function readJsonSafe(response) {
 	} catch {
 		return {};
 	}
+}
+
+function toBase64Url(bytes) {
+	return Buffer.from(bytes)
+		.toString('base64')
+		.replace(/\+/g, '-')
+		.replace(/\//g, '_')
+		.replace(/=+$/g, '');
+}
+
+function buildPasswordHash(password, iterations = 210_000) {
+	const salt = randomBytes(16);
+	const digest = pbkdf2Sync(password, salt, iterations, 32, 'sha256');
+	return `pbkdf2_sha256$${iterations}$${toBase64Url(salt)}$${toBase64Url(digest)}`;
+}
+
+function parseSetCookieValue(setCookieHeader) {
+	const cookiePair = (setCookieHeader ?? '').split(';')[0] ?? '';
+	return cookiePair.trim();
 }
 
 async function waitForPreviewServer(child, baseUrl) {
@@ -78,9 +98,17 @@ async function run() {
 	const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 	const previewPort = await findAvailablePort();
 	const baseUrl = `http://127.0.0.1:${previewPort}`;
+	const testPassword = 'preview-smoke-password';
+	const testPasswordHash = buildPasswordHash(testPassword);
+	const sessionSecret = 'preview-smoke-session-secret';
 	const preview = spawn(npmCommand, ['run', 'preview', '--', '--host', '127.0.0.1', '--port', String(previewPort)], {
 		stdio: 'inherit',
-		env: { ...process.env, CI: '1' }
+		env: {
+			...process.env,
+			CI: '1',
+			APP_ACCESS_PASSWORD_HASH: testPasswordHash,
+			APP_SESSION_SECRET: sessionSecret
+		}
 	});
 
 	try {
@@ -174,10 +202,85 @@ async function run() {
 			'Expected malformed /api/auth/login to return Invalid JSON body'
 		);
 
-		const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST' });
+		const invalidLoginStartedAt = Date.now();
+		const invalidLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				password: 'wrong-password'
+			})
+		});
+		const invalidLoginElapsedMs = Date.now() - invalidLoginStartedAt;
+		assert(
+			invalidLoginResponse.status === 401,
+			`Expected invalid /api/auth/login request to return 401, got ${invalidLoginResponse.status}`
+		);
+		assert(
+			invalidLoginElapsedMs >= 280,
+			`Expected invalid /api/auth/login request to take at least 280ms, got ${invalidLoginElapsedMs}ms`
+		);
+		const invalidLoginBody = await readJsonSafe(invalidLoginResponse);
+		assert(
+			invalidLoginBody.message === 'Invalid credentials',
+			'Expected invalid /api/auth/login to return Invalid credentials'
+		);
+
+		const validLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				password: testPassword
+			})
+		});
+		assert(validLoginResponse.status === 201, `Expected /api/auth/login 201, got ${validLoginResponse.status}`);
+		const validLoginBody = await readJsonSafe(validLoginResponse);
+		assert(validLoginBody.authenticated === true, 'Expected /api/auth/login to return authenticated=true');
+		const setCookie = validLoginResponse.headers.get('set-cookie') ?? '';
+		assert(
+			setCookie.includes('clever_colony_session='),
+			'Expected /api/auth/login to set clever_colony_session cookie'
+		);
+		assert(setCookie.toLowerCase().includes('httponly'), 'Expected /api/auth/login session cookie to be HttpOnly');
+		assert(
+			setCookie.toLowerCase().includes('samesite=lax'),
+			'Expected /api/auth/login session cookie to use SameSite=Lax'
+		);
+		assert(
+			!setCookie.toLowerCase().includes('max-age='),
+			'Expected /api/auth/login session cookie to be browser-session scoped'
+		);
+		const sessionCookieHeader = parseSetCookieValue(setCookie);
+		assert(sessionCookieHeader.length > 0, 'Expected /api/auth/login response to provide a usable cookie header');
+
+		const authenticatedModelsResponse = await fetch(`${baseUrl}/api/models`, {
+			headers: {
+				cookie: sessionCookieHeader
+			}
+		});
+		assert(
+			authenticatedModelsResponse.status === 200,
+			`Expected authenticated /api/models to return 200, got ${authenticatedModelsResponse.status}`
+		);
+		const authenticatedModelsBody = await readJsonSafe(authenticatedModelsResponse);
+		assert(
+			Array.isArray(authenticatedModelsBody.models) && authenticatedModelsBody.models.length > 0,
+			'Expected authenticated /api/models response to include model entries'
+		);
+
+		const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, {
+			method: 'POST',
+			headers: {
+				cookie: sessionCookieHeader
+			}
+		});
 		assert(logoutResponse.status === 200, `Expected /api/auth/logout 200, got ${logoutResponse.status}`);
 		const logoutBody = await readJsonSafe(logoutResponse);
 		assert(logoutBody.authenticated === false, 'Expected /api/auth/logout to return authenticated=false');
+		const logoutSetCookie = logoutResponse.headers.get('set-cookie') ?? '';
+		assert(
+			logoutSetCookie.toLowerCase().includes('clever_colony_session='),
+			'Expected /api/auth/logout to clear clever_colony_session cookie'
+		);
 
 		console.log('Preview smoke checks passed.');
 	} finally {

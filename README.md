@@ -88,7 +88,10 @@ GitHub Actions runs two jobs on pushes and pull requests:
 - `npm run build-storybook`
 
 For local production checks, `npm run test:preview` runs against `vite preview` with Cloudflare
-platform bindings emulated via Wrangler local proxy mode.
+platform bindings emulated via Wrangler local proxy mode. The preview smoke checks include
+unauthenticated access guards, sitemap/manifest/robots metadata probes, login failure timing guard
+verification, and authenticated session-cookie flow checks using ephemeral test credentials injected
+only for the preview process.
 
 ## Health endpoint
 
