@@ -3,7 +3,6 @@ import { countAuditEvents, listAuditEvents, verifyAuditChain } from '$lib/server
 import { getEnv } from '$lib/server/env';
 import { ok } from '$lib/server/http';
 import { auditQuerySchema, parseSearchParams } from '$lib/server/validation';
-import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async (event) => {
@@ -15,12 +14,6 @@ export const GET: RequestHandler = async (event) => {
 	const includeVerification = query.verify;
 	const createdFrom = query.dateFrom ? Date.parse(`${query.dateFrom}T00:00:00.000Z`) : undefined;
 	const createdTo = query.dateTo ? Date.parse(`${query.dateTo}T23:59:59.999Z`) : undefined;
-	if (query.dateFrom && Number.isNaN(createdFrom)) {
-		throw error(400, 'dateFrom is invalid');
-	}
-	if (query.dateTo && Number.isNaN(createdTo)) {
-		throw error(400, 'dateTo is invalid');
-	}
 
 	const events = await listAuditEvents(env.DB, {
 		limit,

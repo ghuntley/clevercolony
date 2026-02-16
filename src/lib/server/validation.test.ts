@@ -205,6 +205,20 @@ describe('parseSearchParams', () => {
 		}
 	});
 
+	it('rejects impossible audit calendar dates', () => {
+		expect(() =>
+			parseSearchParams(new URLSearchParams([['dateTo', '2026-02-31']]), auditQuerySchema)
+		).toThrow();
+		try {
+			parseSearchParams(new URLSearchParams([['dateTo', '2026-02-31']]), auditQuerySchema);
+		} catch (thrown) {
+			expect(thrown).toMatchObject({
+				status: 400,
+				body: { message: 'dateTo is not a valid calendar date' }
+			});
+		}
+	});
+
 	it('rejects invalid audit pagination params', () => {
 		expect(() => parseSearchParams(new URLSearchParams([['limit', '0']]), auditQuerySchema)).toThrow();
 		try {

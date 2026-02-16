@@ -19,6 +19,26 @@ const memoryContentSchema = z
 const optionalConversationIdSchema = z.string().trim().min(1, 'conversationId cannot be empty').max(128).nullable().optional();
 const resourceIdSchema = z.string().trim().min(1, 'id is required').max(128, 'id is too long');
 const pathParamValueSchema = z.string().trim().min(1).max(128, 'path parameter is too long');
+const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidIsoDate(value: string): boolean {
+	if (!isoDatePattern.test(value)) return false;
+	const [yearText, monthText, dayText] = value.split('-');
+	const year = Number(yearText);
+	const month = Number(monthText);
+	const day = Number(dayText);
+	if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+	if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+	const date = new Date(Date.UTC(year, month - 1, day));
+	return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+const dateParam = (label: 'dateFrom' | 'dateTo') =>
+	z
+		.string()
+		.trim()
+		.regex(isoDatePattern, `${label} must be YYYY-MM-DD`)
+		.refine((value) => isValidIsoDate(value), `${label} is not a valid calendar date`);
 
 export const chatRequestSchema = z.object({
 	conversationId: conversationIdSchema,
@@ -137,8 +157,8 @@ export const auditQuerySchema = z.object({
 		.min(1, 'conversationQuery cannot be empty')
 		.max(128, 'conversationQuery is too long')
 		.optional(),
-	dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateFrom must be YYYY-MM-DD').optional(),
-	dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateTo must be YYYY-MM-DD').optional(),
+	dateFrom: dateParam('dateFrom').optional(),
+	dateTo: dateParam('dateTo').optional(),
 	verify: z.preprocess((value) => value === '1', z.boolean())
 }).refine((input) => {
 	if (!input.dateFrom || !input.dateTo) return true;
