@@ -108,3 +108,33 @@ npx wrangler d1 migrations apply clever-colony --local
 - R2 image retrieval is auth-gated
 - Mermaid rendering uses strict security mode
 - Web search is opt-in per message and result-capped
+
+## Runtime policies (best-practice defaults)
+
+### R2 image policy
+
+- Bucket is treated as private; images are served through authenticated app endpoints.
+- Generated image objects are stored under app-managed keys and linked in D1 (`image_assets`).
+- Default retention target is **90 days**, with manual deletion available through app-level delete flows.
+- For production, set an R2 lifecycle rule to enforce expiry and limit storage growth.
+
+### Web search policy (Serper)
+
+- Search is **manual per message** (toggle in composer); default is off.
+- Scope is the Serper `search` endpoint only.
+- Result depth is capped at top 5 normalized citations to control token and quota usage.
+- If Serper is unavailable or key is missing, chat still runs without search grounding.
+
+### Mermaid policy
+
+- Mermaid blocks are normalized server-side and rendered client-side.
+- Rendering runs in strict security mode.
+- Oversized/invalid Mermaid payloads are rejected or rendered as source fallback.
+- Diagram source is available for copy/inspection in the UI.
+
+### Audit policy
+
+- All authenticated users can view the audit trail.
+- Prompt-submit events store full prompt text.
+- Audit events are append-only by contract and protected by DB triggers.
+- Hash-chain fields (`prev_hash`, `event_hash`) are available for tamper-evidence verification.
