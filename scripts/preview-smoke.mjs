@@ -100,6 +100,14 @@ async function run() {
 		const location = rootResponse.headers.get('location') ?? '';
 		assert(location.endsWith('/login'), `Expected / redirect location to end with /login, got "${location}"`);
 
+		const robotsResponse = await fetch(`${baseUrl}/robots.txt`);
+		assert(robotsResponse.status === 200, `Expected /robots.txt 200, got ${robotsResponse.status}`);
+		const robotsBody = await robotsResponse.text();
+		assert(
+			robotsBody.includes('Sitemap: /sitemap.xml'),
+			'Expected /robots.txt to advertise sitemap location'
+		);
+
 		const sitemapResponse = await fetch(`${baseUrl}/sitemap.xml`);
 		assert(sitemapResponse.status === 200, `Expected /sitemap.xml 200, got ${sitemapResponse.status}`);
 		const sitemapContentType = sitemapResponse.headers.get('content-type') ?? '';

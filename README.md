@@ -106,6 +106,9 @@ Unauthenticated access is intentionally limited to:
 - compiled app assets under `/_app/*`
 - metadata/SEO assets (`/robots.txt`, `/sitemap.xml`, `/favicon.ico`, `/manifest.webmanifest`, `/site.webmanifest`)
 
+`/sitemap.xml` is dynamically generated from the current request origin so deploy previews always
+emit correct absolute URLs.
+
 ## Environment variables
 
 Configure these in Cloudflare Pages project settings (and locally through Wrangler where needed):
