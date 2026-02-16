@@ -1,5 +1,6 @@
 import type { AuditEvent, ChatMessage, Conversation, MemoryRecord } from '$lib/types';
 import { computeAuditEventHash, verifyAuditChainEntries } from '$lib/server/audit-chain';
+import { deriveConversationTitle, shouldAutoTitleConversation } from '$lib/conversation-title';
 
 interface ConversationRow {
 	id: string;
@@ -259,6 +260,48 @@ export async function addMessage(
 		createdAt: now,
 		updatedAt: now
 	};
+}
+
+export async function maybeAutoTitleConversationFromMessage(
+	db: D1Database,
+	input: {
+		conversationId: string;
+		messageId: string;
+		messageText: string;
+	}
+): Promise<string | null> {
+	const candidateTitle = deriveConversationTitle(input.messageText);
+	if (!candidateTitle) return null;
+
+	const conversation = await db
+		.prepare(`SELECT title FROM conversations WHERE id = ?1`)
+		.bind(input.conversationId)
+		.first<{ title: string }>();
+
+	if (!conversation || !shouldAutoTitleConversation(conversation.title)) {
+		return null;
+	}
+
+	const now = Date.now();
+	const updateResult = await db
+		.prepare(
+			`UPDATE conversations
+       SET title = ?2, updated_at = ?5
+       WHERE id = ?1
+         AND (title = ?3 OR TRIM(title) = '')
+         AND NOT EXISTS (
+           SELECT 1
+           FROM messages
+           WHERE conversation_id = ?1
+             AND role = 'user'
+             AND id != ?4
+         )`
+		)
+		.bind(input.conversationId, candidateTitle, conversation.title, input.messageId, now)
+		.run();
+
+	const changes = Number((updateResult as { meta?: { changes?: number } }).meta?.changes ?? 0);
+	return changes > 0 ? candidateTitle : null;
 }
 
 export async function updateMessage(

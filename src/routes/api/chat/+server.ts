@@ -1,6 +1,6 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
-import { addMessage, listMemories, listMessages } from '$lib/server/db';
+import { addMessage, listMemories, listMessages, maybeAutoTitleConversationFromMessage } from '$lib/server/db';
 import { getEnv, requireEnv } from '$lib/server/env';
 import { DEFAULT_TEXT_MODEL, getModelById } from '$lib/server/models';
 import { generateTextResponse } from '$lib/server/providers';
@@ -47,6 +47,24 @@ export const POST: RequestHandler = async (event) => {
 			provider
 		}
 	});
+
+	const autoTitle = await maybeAutoTitleConversationFromMessage(env.DB, {
+		conversationId,
+		messageId: userMessage.id,
+		messageText: text
+	});
+	if (autoTitle) {
+		await logAuditEvent({
+			db: env.DB,
+			sessionId: event.locals.sessionId!,
+			conversationId,
+			actionType: 'conversation.autotitle',
+			payload: {
+				title: autoTitle,
+				sourceMessageId: userMessage.id
+			}
+		});
+	}
 
 	await logAuditEvent({
 		db: env.DB,
