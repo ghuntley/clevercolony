@@ -847,12 +847,6 @@
 			<AuditTimeline
 				events={auditEvents}
 				chainValid={auditChainValid}
-				filters={{
-					actionType: auditActionType,
-					conversationQuery: auditConversationQuery,
-					dateFrom: auditDateFrom,
-					dateTo: auditDateTo
-				}}
 				onFilterChange={handleAuditFilterChange}
 			/>
 			<div class="audit-controls">

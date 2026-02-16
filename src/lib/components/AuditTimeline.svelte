@@ -11,21 +11,15 @@
 	interface Props {
 		events: AuditEvent[];
 		chainValid?: boolean | null;
-		filters?: AuditFilterState;
 		onFilterChange?: (filters: AuditFilterState) => void;
 	}
 
-	let {
-		events,
-		chainValid = null,
-		filters = { actionType: '', conversationQuery: '', dateFrom: '', dateTo: '' },
-		onFilterChange
-	}: Props = $props();
+	let { events, chainValid = null, onFilterChange }: Props = $props();
 	let selected = $state<AuditEvent | null>(null);
-	let actionType = $state(filters.actionType);
-	let conversationQuery = $state(filters.conversationQuery);
-	let dateFrom = $state(filters.dateFrom);
-	let dateTo = $state(filters.dateTo);
+	let actionType = $state('');
+	let conversationQuery = $state('');
+	let dateFrom = $state('');
+	let dateTo = $state('');
 	let filterDebounce: ReturnType<typeof setTimeout> | null = null;
 
 	function formatTime(timestamp: number) {
