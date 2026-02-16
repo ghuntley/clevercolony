@@ -446,6 +446,10 @@
 		mobileQuery.addEventListener('change', syncViewport);
 
 		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape' && (sidebarOpen || rightRailOpen)) {
+				closeMobilePanels();
+				return;
+			}
 			const isModifier = event.ctrlKey || event.metaKey;
 			if (isModifier && event.shiftKey && event.key.toLowerCase() === 'o') {
 				event.preventDefault();
