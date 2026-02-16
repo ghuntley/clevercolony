@@ -30,6 +30,9 @@
 	let auditChainValid = $state<boolean | null>(null);
 	let streamingText = $state('');
 	let messagesContainer = $state<HTMLElement | null>(null);
+	let sidebarOpen = $state(false);
+	let rightRailOpen = $state(false);
+	let isMobileViewport = $state(false);
 
 	const filteredConversations = $derived(
 		conversations.filter((conversation) =>
@@ -47,6 +50,11 @@
 	function scrollMessagesToBottom() {
 		if (!messagesContainer) return;
 		messagesContainer.scrollTop = messagesContainer.scrollHeight;
+	}
+
+	function closeMobilePanels() {
+		sidebarOpen = false;
+		rightRailOpen = false;
 	}
 
 	$effect(() => {
@@ -98,6 +106,9 @@
 		const data = await fetchJson<{ messages: ChatMessage[] }>(`/api/conversations/${conversationId}`);
 		messages = data.messages;
 		queueMicrotask(scrollMessagesToBottom);
+		if (isMobileViewport) {
+			closeMobilePanels();
+		}
 		if (syncModel) {
 			const conversation = conversations.find((item) => item.id === conversationId);
 			if (conversation) {
@@ -362,6 +373,15 @@
 		queueMicrotask(scrollMessagesToBottom);
 	});
 
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+		const shouldLockScroll = isMobileViewport && (sidebarOpen || rightRailOpen);
+		document.body.style.overflow = shouldLockScroll ? 'hidden' : '';
+		return () => {
+			document.body.style.overflow = '';
+		};
+	});
+
 	async function sendImagePrompt() {
 		if (!activeConversationId || !prompt.trim()) return;
 		const model = models.find((item) => item.id === selectedModelId);
@@ -408,6 +428,16 @@
 	}
 
 	onMount(() => {
+		const mobileQuery = window.matchMedia('(max-width: 900px)');
+		const syncViewport = () => {
+			isMobileViewport = mobileQuery.matches;
+			if (!mobileQuery.matches) {
+				closeMobilePanels();
+			}
+		};
+		syncViewport();
+		mobileQuery.addEventListener('change', syncViewport);
+
 		const onKeyDown = (event: KeyboardEvent) => {
 			const isModifier = event.ctrlKey || event.metaKey;
 			if (isModifier && event.shiftKey && event.key.toLowerCase() === 'o') {
@@ -437,6 +467,7 @@
 
 		return () => {
 			window.removeEventListener('keydown', onKeyDown);
+			mobileQuery.removeEventListener('change', syncViewport);
 		};
 	});
 </script>
@@ -445,10 +476,13 @@
 	<main class="loading">Loading Clever Colony…</main>
 {:else}
 	<div class="app">
-		<aside class="sidebar">
+		<aside class="sidebar {isMobileViewport && sidebarOpen ? 'open' : ''}">
 			<header>
 				<h1>Clever Colony</h1>
 				<button type="button" onclick={createConversation}>+ New chat</button>
+				{#if isMobileViewport}
+					<button type="button" class="panel-close" onclick={closeMobilePanels}>✕</button>
+				{/if}
 			</header>
 			<input bind:value={conversationSearch} placeholder="Search your threads…" />
 
@@ -510,6 +544,28 @@
 					<h2>{activeConversation?.title ?? 'No conversation selected'}</h2>
 					<p>{activeConversation ? activeConversation.model : 'Choose a conversation to start'}</p>
 				</div>
+				{#if isMobileViewport}
+					<div class="mobile-panel-controls">
+						<button
+							type="button"
+							onclick={() => {
+								sidebarOpen = true;
+								rightRailOpen = false;
+							}}
+						>
+							Threads
+						</button>
+						<button
+							type="button"
+							onclick={() => {
+								rightRailOpen = true;
+								sidebarOpen = false;
+							}}
+						>
+							Context
+						</button>
+					</div>
+				{/if}
 				<div class="controls">
 					<label>
 						Mode
@@ -611,7 +667,13 @@
 			{/if}
 		</main>
 
-		<aside class="right-rail">
+		<aside class="right-rail {isMobileViewport && rightRailOpen ? 'open' : ''}">
+			{#if isMobileViewport}
+				<div class="right-rail-mobile-header">
+					<strong>Context panel</strong>
+					<button type="button" class="panel-close" onclick={closeMobilePanels}>✕</button>
+				</div>
+			{/if}
 			<section class="memory">
 				<header>
 					<h3>Memory subsystem</h3>
@@ -659,6 +721,10 @@
 
 			<AuditTimeline events={auditEvents} chainValid={auditChainValid} />
 		</aside>
+
+		{#if isMobileViewport && (sidebarOpen || rightRailOpen)}
+			<button type="button" class="overlay-backdrop" onclick={closeMobilePanels} aria-label="Close side panels"></button>
+		{/if}
 	</div>
 {/if}
 
@@ -728,6 +794,7 @@
 		align-items: center;
 		justify-content: space-between;
 		margin-bottom: 0.75rem;
+		gap: 0.35rem;
 	}
 
 	input,
@@ -804,6 +871,12 @@
 		justify-content: space-between;
 		align-items: flex-start;
 		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	.mobile-panel-controls {
+		display: inline-flex;
+		gap: 0.4rem;
 	}
 
 	.controls {
@@ -912,6 +985,13 @@
 		margin-top: 0.45rem;
 	}
 
+	.right-rail-mobile-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.7rem;
+	}
+
 	@media (max-width: 1300px) {
 		.app {
 			grid-template-columns: 30ch 1fr;
@@ -928,10 +1008,56 @@
 			grid-template-columns: 1fr;
 		}
 
-		.sidebar,
 		.chat {
 			border-right: none;
-			border-bottom: 2px solid var(--cc-border-soft);
+			border-bottom: none;
+		}
+
+		.sidebar,
+		.right-rail {
+			position: fixed;
+			top: 0;
+			bottom: 0;
+			width: min(92vw, 34ch);
+			background: var(--cc-bg);
+			overflow: auto;
+			z-index: 40;
+			transition: transform 0.15s ease;
+			padding-top: 0.8rem;
+			padding-bottom: 1rem;
+		}
+
+		.sidebar {
+			left: 0;
+			transform: translateX(-105%);
+			border-right: 2px solid var(--cc-border-soft);
+		}
+
+		.sidebar.open {
+			transform: translateX(0);
+		}
+
+		.right-rail {
+			right: 0;
+			transform: translateX(105%);
+			border-left: 2px solid var(--cc-border-soft);
+		}
+
+		.right-rail.open {
+			transform: translateX(0);
+		}
+
+		.overlay-backdrop {
+			position: fixed;
+			inset: 0;
+			z-index: 30;
+			background: rgb(0 0 0 / 0.45);
+			border: none;
+			padding: 0;
+		}
+
+		.panel-close {
+			min-width: 2.4rem;
 		}
 	}
 </style>
