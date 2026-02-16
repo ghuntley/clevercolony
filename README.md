@@ -73,6 +73,12 @@ Run production preview smoke checks (local build + preview route/auth probes):
 npm run test:preview
 ```
 
+Run full release validation bundle (smoke + Storybook + preview probes):
+
+```bash
+npm run test:release
+```
+
 ## Continuous integration
 
 GitHub Actions runs two jobs on pushes and pull requests:
