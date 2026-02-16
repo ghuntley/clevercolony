@@ -2,19 +2,16 @@ import { assertAuthenticatedApi } from '$lib/server/auth';
 import { countAuditEvents, listAuditEvents, verifyAuditChain } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { ok } from '$lib/server/http';
+import { auditQuerySchema, parseSearchParams } from '$lib/server/validation';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
 
-	const requestedLimit = Number(event.url.searchParams.get('limit') ?? 50);
-	const requestedOffset = Number(event.url.searchParams.get('offset') ?? 0);
-	const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 50, 1), 200);
-	const offset = Math.max(Number.isFinite(requestedOffset) ? requestedOffset : 0, 0);
-	const actionType = event.url.searchParams.get('actionType');
-	const conversationId = event.url.searchParams.get('conversationId');
-	const includeVerification = event.url.searchParams.get('verify') === '1';
+	const query = parseSearchParams(event.url.searchParams, auditQuerySchema);
+	const { limit, offset, actionType, conversationId } = query;
+	const includeVerification = query.verify;
 
 	const events = await listAuditEvents(env.DB, {
 		limit,

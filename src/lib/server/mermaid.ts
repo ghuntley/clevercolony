@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { DiagramPayload } from '$lib/types';
 
-const MAX_MERMAID_LENGTH = 24_000;
+export const MAX_MERMAID_LENGTH = 24_000;
 
 export function normalizeMermaidSource(source: string): DiagramPayload {
 	const cleaned = source.trim();

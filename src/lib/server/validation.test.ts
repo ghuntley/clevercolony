@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+	auditQuerySchema,
 	chatRequestSchema,
 	createConversationRequestSchema,
 	createMemoryRequestSchema,
 	imageRequestSchema,
+	loginRequestSchema,
 	parseJsonBody,
+	parseSearchParams,
 	updateConversationRequestSchema,
-	updateMemoryRequestSchema
+	updateMemoryRequestSchema,
+	webSearchToolRequestSchema
 } from './validation';
 
 describe('parseJsonBody', () => {
@@ -110,5 +114,55 @@ describe('parseJsonBody', () => {
 			status: 400,
 			body: { message: 'No memory updates provided' }
 		});
+	});
+
+	it('rejects blank password payloads', async () => {
+		const request = new Request('http://example.test/login', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ password: '   ' })
+		});
+		await expect(parseJsonBody(request, loginRequestSchema)).rejects.toMatchObject({
+			status: 400,
+			body: { message: 'Password is required' }
+		});
+	});
+
+	it('validates web search locale codes', async () => {
+		const request = new Request('http://example.test/tools/web-search', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				query: 'latest model releases',
+				gl: 'USA'
+			})
+		});
+		await expect(parseJsonBody(request, webSearchToolRequestSchema)).rejects.toMatchObject({
+			status: 400,
+			body: { message: 'gl must be 2 letters' }
+		});
+	});
+});
+
+describe('parseSearchParams', () => {
+	it('parses defaults for omitted audit params', () => {
+		const parsed = parseSearchParams(new URLSearchParams(), auditQuerySchema);
+		expect(parsed).toMatchObject({
+			limit: 50,
+			offset: 0,
+			verify: false
+		});
+	});
+
+	it('rejects invalid audit pagination params', () => {
+		expect(() => parseSearchParams(new URLSearchParams([['limit', '0']]), auditQuerySchema)).toThrow();
+		try {
+			parseSearchParams(new URLSearchParams([['limit', '0']]), auditQuerySchema);
+		} catch (thrown) {
+			expect(thrown).toMatchObject({
+				status: 400,
+				body: { message: 'limit must be >= 1' }
+			});
+		}
 	});
 });

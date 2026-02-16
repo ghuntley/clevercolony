@@ -1,6 +1,7 @@
 import { MAX_IMAGE_PROMPT_CHARS, MAX_TEXT_PROMPT_CHARS } from '../request-limits';
 import { error } from '@sveltejs/kit';
 import { z } from 'zod';
+import { MAX_MERMAID_LENGTH } from './mermaid';
 
 const providerSchema = z.enum(['zai', 'cloudflare-ai']);
 
@@ -15,6 +16,7 @@ const memoryContentSchema = z
 	.trim()
 	.min(1, 'Memory content is required')
 	.max(4000, 'Memory content is too long');
+const optionalConversationIdSchema = z.string().trim().min(1, 'conversationId cannot be empty').max(128).nullable().optional();
 
 export const chatRequestSchema = z.object({
 	conversationId: conversationIdSchema,
@@ -66,7 +68,7 @@ export const updateConversationRequestSchema = z
 export const createMemoryRequestSchema = z
 	.object({
 		scope: z.enum(['global', 'conversation']).optional(),
-		conversationId: z.string().trim().min(1, 'conversationId cannot be empty').nullable().optional(),
+		conversationId: optionalConversationIdSchema,
 		content: memoryContentSchema,
 		tags: tagsSchema,
 		score: scoreSchema.optional()
@@ -86,6 +88,50 @@ export const updateMemoryRequestSchema = z
 		message: 'No memory updates provided'
 	});
 
+export const loginRequestSchema = z.object({
+	password: z.string().trim().min(1, 'Password is required').max(256, 'Password is too long')
+});
+
+export const webSearchToolRequestSchema = z.object({
+	query: z.string().trim().min(1, 'Search query is required').max(500, 'Search query is too long'),
+	gl: z.string().trim().regex(/^[a-z]{2}$/i, 'gl must be 2 letters').optional(),
+	hl: z.string().trim().regex(/^[a-z]{2}(?:-[a-z]{2})?$/i, 'hl must be language code').optional(),
+	num: z.number().int().min(1, 'num must be at least 1').max(10, 'num must be at most 10').optional(),
+	conversationId: optionalConversationIdSchema
+});
+
+export const mermaidToolRequestSchema = z.object({
+	source: z
+		.string()
+		.trim()
+		.min(1, 'Mermaid source is required')
+		.max(MAX_MERMAID_LENGTH, `Mermaid source exceeds ${MAX_MERMAID_LENGTH} characters`),
+	conversationId: optionalConversationIdSchema,
+	title: z.string().trim().min(1, 'title cannot be empty').max(120, 'title is too long').optional()
+});
+
+const numberParam = (fallback: number, min: number, max: number, label: string) =>
+	z.preprocess(
+		(value) => {
+			if (value === null || value === undefined || value === '') return fallback;
+			const parsed = Number(value);
+			return Number.isFinite(parsed) ? parsed : NaN;
+		},
+		z
+			.number()
+			.int(`${label} must be an integer`)
+			.min(min, `${label} must be >= ${min}`)
+			.max(max, `${label} must be <= ${max}`)
+	);
+
+export const auditQuerySchema = z.object({
+	limit: numberParam(50, 1, 200, 'limit'),
+	offset: numberParam(0, 0, 100_000, 'offset'),
+	actionType: z.string().trim().min(1, 'actionType cannot be empty').max(120, 'actionType is too long').optional(),
+	conversationId: z.string().trim().min(1, 'conversationId cannot be empty').max(128, 'conversationId is too long').optional(),
+	verify: z.preprocess((value) => value === '1', z.boolean())
+});
+
 export async function parseJsonBody<TSchema extends z.ZodTypeAny>(
 	request: Request,
 	schema: TSchema
@@ -100,6 +146,18 @@ export async function parseJsonBody<TSchema extends z.ZodTypeAny>(
 	const parsed = schema.safeParse(body);
 	if (!parsed.success) {
 		throw error(400, parsed.error.issues[0]?.message ?? 'Invalid request body');
+	}
+	return parsed.data;
+}
+
+export function parseSearchParams<TSchema extends z.ZodTypeAny>(
+	searchParams: URLSearchParams,
+	schema: TSchema
+): z.infer<TSchema> {
+	const values = Object.fromEntries(searchParams.entries());
+	const parsed = schema.safeParse(values);
+	if (!parsed.success) {
+		throw error(400, parsed.error.issues[0]?.message ?? 'Invalid query parameters');
 	}
 	return parsed.data;
 }

@@ -3,23 +3,17 @@ import { logAuditEvent } from '$lib/server/audit';
 import { getEnv } from '$lib/server/env';
 import { ok } from '$lib/server/http';
 import { normalizeMermaidSource } from '$lib/server/mermaid';
-import { error, type RequestHandler } from '@sveltejs/kit';
+import { mermaidToolRequestSchema, parseJsonBody } from '$lib/server/validation';
+import type { RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const body = (await event.request.json().catch(() => ({}))) as {
-		source?: string;
-		conversationId?: string | null;
-		title?: string;
-	};
-	if (!body.source) {
-		throw error(400, 'Mermaid source is required');
-	}
+	const body = await parseJsonBody(event.request, mermaidToolRequestSchema);
 
 	const diagram = normalizeMermaidSource(body.source);
-	if (body.title?.trim()) {
-		diagram.title = body.title.trim();
+	if (body.title) {
+		diagram.title = body.title;
 	}
 
 	await logAuditEvent({
