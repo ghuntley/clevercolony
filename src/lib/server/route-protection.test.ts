@@ -26,6 +26,7 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/api/conversations')).toBe(false);
 		expect(isUnprotectedPath('/api/authz/login')).toBe(false);
 		expect(isUnprotectedPath('/api/healthcheck')).toBe(false);
+		expect(isUnprotectedPath('/api/health/ready')).toBe(false);
 		expect(isUnprotectedPath('/favicon-admin')).toBe(false);
 		expect(isUnprotectedPath('/robots.txt/extra')).toBe(false);
 		expect(isUnprotectedPath('/sitemap.xml/extra')).toBe(false);
