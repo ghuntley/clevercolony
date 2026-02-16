@@ -1,7 +1,7 @@
-import type { AuditEvent, ChatMessage, Conversation, MemoryRecord } from '$lib/types';
-import { computeAuditEventHash, verifyAuditChainEntries } from '$lib/server/audit-chain';
-import { buildAuditFilterWhere } from '$lib/server/audit-query';
-import { deriveConversationTitle, shouldAutoTitleConversation } from '$lib/conversation-title';
+import type { AuditEvent, ChatMessage, Conversation, MemoryRecord } from '../types';
+import { computeAuditEventHash, verifyAuditChainEntries } from './audit-chain';
+import { buildAuditFilterWhere } from './audit-query';
+import { deriveConversationTitle, shouldAutoTitleConversation } from '../conversation-title';
 
 interface ConversationRow {
 	id: string;
@@ -620,4 +620,22 @@ export async function verifyAuditChain(db: D1Database): Promise<boolean> {
 		eventHash: row.event_hash
 	}));
 	return verifyAuditChainEntries(entries);
+}
+
+export async function revokeSession(db: D1Database, sessionId: string): Promise<void> {
+	await db
+		.prepare(
+			`INSERT OR REPLACE INTO revoked_sessions (session_id, revoked_at)
+       VALUES (?1, ?2)`
+		)
+		.bind(sessionId, Date.now())
+		.run();
+}
+
+export async function isSessionRevoked(db: D1Database, sessionId: string): Promise<boolean> {
+	const row = await db
+		.prepare(`SELECT session_id FROM revoked_sessions WHERE session_id = ?1 LIMIT 1`)
+		.bind(sessionId)
+		.first<{ session_id: string }>();
+	return Boolean(row?.session_id);
 }

@@ -1,4 +1,5 @@
 import { clearSessionCookie } from '$lib/server/auth';
+import { revokeSession } from '$lib/server/db';
 import { ok } from '$lib/server/http';
 import { getEnv } from '$lib/server/env';
 import { logAuditEvent } from '$lib/server/audit';
@@ -7,6 +8,7 @@ import type { RequestHandler } from './$types';
 export const POST: RequestHandler = async (event) => {
 	const env = getEnv(event);
 	if (event.locals.sessionId) {
+		await revokeSession(env.DB, event.locals.sessionId);
 		await logAuditEvent({
 			db: env.DB,
 			sessionId: event.locals.sessionId,

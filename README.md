@@ -106,8 +106,10 @@ Run the deployed-smoke runner locally against an ephemeral preview server:
 npm run test:deployed:local
 ```
 
-This local helper runs the deployed probe contract in **unauthenticated mode** (no `SMOKE_PASSWORD`),
-which is useful for quickly validating routing/auth boundaries before testing against a live URL.
+This local helper runs the deployed probe contract in both:
+- **unauthenticated mode** (boundary probes), and
+- **authenticated mode** (login/session/logout probes),
+using ephemeral preview-only credentials. It auto-applies local D1 migrations before probing.
 
 ## Continuous integration
 
@@ -131,7 +133,8 @@ only for the preview process, including post-logout access denial verification a
 chat/data APIs and allowlist-boundary regression probes for lookalike routes (for example
 `/api/authz/*`, `/api/healthcheck`, `/robots.txt/extra`), plus a probe that compiled app assets
 remain reachable via `/_app/*` while unauthenticated and similarly named non-asset paths
-(for example `/_appx/*`) remain protected.
+(for example `/_appx/*`) remain protected. Preview smoke auto-applies local D1 migrations before
+running to keep authentication/audit assertions reliable.
 The same probe contract can be run against deployed environments through `npm run test:deployed`.
 
 ## Health endpoint

@@ -1,5 +1,6 @@
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import process from 'node:process';
+import { applyLocalD1Migrations } from './local-d1.mjs';
 import { startPreviewServer, stopPreviewServer } from './preview-runtime.mjs';
 import { runSmokeProbes } from './smoke-probes.mjs';
 
@@ -18,6 +19,8 @@ function buildPasswordHash(password, iterations = 210_000) {
 }
 
 async function run() {
+	await applyLocalD1Migrations();
+
 	const testPassword = 'preview-smoke-password';
 	const testPasswordHash = buildPasswordHash(testPassword);
 	const sessionSecret = 'preview-smoke-session-secret';

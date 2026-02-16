@@ -1,13 +1,21 @@
 import type { Handle } from '@sveltejs/kit';
-import { readSessionId, requireSessionSecret } from '$lib/server/auth';
+import { readSessionId } from '$lib/server/auth';
+import { isSessionRevoked } from '$lib/server/db';
+import { optionalEnv } from '$lib/server/env';
 import { isUnprotectedPath } from '$lib/server/route-protection';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	let sessionId: string | null = null;
 
-	if (event.platform?.env?.APP_SESSION_SECRET) {
-		const secret = requireSessionSecret(event.platform.env);
-		sessionId = await readSessionId(event.cookies, secret);
+	const sessionSecret = optionalEnv(event.platform?.env?.APP_SESSION_SECRET, 'APP_SESSION_SECRET');
+	if (sessionSecret) {
+		sessionId = await readSessionId(event.cookies, sessionSecret);
+	}
+	if (sessionId && event.platform?.env?.DB) {
+		const revoked = await isSessionRevoked(event.platform.env.DB, sessionId);
+		if (revoked) {
+			sessionId = null;
+		}
 	}
 
 	event.locals.sessionId = sessionId;
