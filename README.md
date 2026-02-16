@@ -107,6 +107,33 @@ Apply D1 schema migrations:
 npx wrangler d1 migrations apply clever-colony --local
 ```
 
+## Cloudflare Pages deployment checklist
+
+1. Create a Cloudflare Pages project connected to this repository/branch.
+2. Configure build settings:
+   - Build command: `npm run build`
+   - Build output directory: `.svelte-kit/cloudflare`
+3. Add bindings in Pages settings matching `wrangler.toml`:
+   - D1 database binding `DB`
+   - R2 bucket binding `MEDIA_BUCKET`
+   - AI binding `AI`
+4. Add required environment variables:
+   - `APP_ACCESS_PASSWORD_HASH`
+   - `APP_SESSION_SECRET`
+   - `ZAI_API_KEY` (if using ZAI models)
+   - `SERPER_API_KEY` (if using web search)
+5. Apply D1 migrations to the remote database before first production traffic:
+
+```bash
+npx wrangler d1 migrations apply clever-colony --remote
+```
+
+6. Run smoke checks before shipping:
+
+```bash
+npm run test:smoke
+```
+
 ## Security posture (MVP)
 
 - Shared-password session gate (browser-session cookie only)
