@@ -49,6 +49,12 @@ export function shouldUseSecureCookies(requestUrl: URL): boolean {
 	return requestUrl.protocol === 'https:';
 }
 
+export async function enforceMinimumAuthResponseTime(startedAtMs: number, minimumDurationMs: number) {
+	const elapsed = Date.now() - startedAtMs;
+	if (elapsed >= minimumDurationMs) return;
+	await new Promise((resolve) => setTimeout(resolve, minimumDurationMs - elapsed));
+}
+
 export async function setSessionCookie(
 	cookies: Cookies,
 	secret: string,

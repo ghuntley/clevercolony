@@ -1,6 +1,7 @@
 import { created } from '$lib/server/http';
 import { getEnv } from '$lib/server/env';
 import {
+	enforceMinimumAuthResponseTime,
 	requireSessionSecret,
 	setSessionCookie,
 	shouldUseSecureCookies,
@@ -11,11 +12,13 @@ import { loginRequestSchema, parseJsonBody } from '$lib/server/validation';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async (event) => {
+	const requestStartedAt = Date.now();
 	const env = getEnv(event);
 	const body = await parseJsonBody(event.request, loginRequestSchema);
 	const password = body.password;
 
 	const isValid = await validatePasswordAgainstEnv(password, env);
+	await enforceMinimumAuthResponseTime(requestStartedAt, 300);
 	if (!isValid) {
 		throw error(401, 'Invalid credentials');
 	}
