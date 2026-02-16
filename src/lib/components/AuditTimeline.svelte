@@ -53,6 +53,13 @@
 			}
 		};
 	});
+
+	function clearFilters() {
+		actionType = '';
+		conversationQuery = '';
+		dateFrom = '';
+		dateTo = '';
+	}
 </script>
 
 <section class="audit">
@@ -90,6 +97,7 @@
 			To
 			<input bind:value={dateTo} type="date" />
 		</label>
+		<button type="button" class="clear-filters" onclick={clearFilters}>Clear filters</button>
 	</div>
 
 	<ul>
@@ -184,6 +192,11 @@ event: {selected.eventHash}</pre
 	.filters input,
 	.filters select {
 		width: 100%;
+	}
+
+	.clear-filters {
+		align-self: end;
+		justify-self: start;
 	}
 
 	ul {
