@@ -8,8 +8,10 @@ export const GET: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
 
-	const limit = Number(event.url.searchParams.get('limit') ?? 50);
-	const offset = Number(event.url.searchParams.get('offset') ?? 0);
+	const requestedLimit = Number(event.url.searchParams.get('limit') ?? 50);
+	const requestedOffset = Number(event.url.searchParams.get('offset') ?? 0);
+	const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 50, 1), 200);
+	const offset = Math.max(Number.isFinite(requestedOffset) ? requestedOffset : 0, 0);
 	const actionType = event.url.searchParams.get('actionType');
 	const conversationId = event.url.searchParams.get('conversationId');
 	const includeVerification = event.url.searchParams.get('verify') === '1';
@@ -28,6 +30,9 @@ export const GET: RequestHandler = async (event) => {
 
 	return ok({
 		events,
-		chainValid
+		chainValid,
+		limit,
+		offset,
+		hasMore: events.length === limit
 	});
 };

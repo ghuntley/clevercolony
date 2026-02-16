@@ -10,6 +10,7 @@
 
 	type Mode = 'chat' | 'image';
 	type Theme = 'dark' | 'light';
+	const AUDIT_PAGE_SIZE = 100;
 
 	let loading = $state(true);
 	let errorMessage = $state('');
@@ -31,6 +32,9 @@
 	let editingMemoryText = $state('');
 	let auditEvents = $state<AuditEvent[]>([]);
 	let auditChainValid = $state<boolean | null>(null);
+	let auditOffset = $state(0);
+	let auditHasMore = $state(false);
+	let auditLoading = $state(false);
 	let streamingText = $state('');
 	let messagesContainer = $state<HTMLElement | null>(null);
 	let sidebarOpen = $state(false);
@@ -251,10 +255,26 @@
 		memories = memories.filter((memory) => memory.id !== id);
 	}
 
-	async function loadAudit() {
-		const data = await fetchJson<{ events: AuditEvent[]; chainValid?: boolean }>('/api/audit?limit=200&verify=1');
-		auditEvents = data.events;
-		auditChainValid = typeof data.chainValid === 'boolean' ? data.chainValid : null;
+	async function loadAudit(options?: { reset?: boolean }) {
+		const reset = options?.reset ?? true;
+		if (auditLoading) return;
+		auditLoading = true;
+		const offset = reset ? 0 : auditOffset;
+		try {
+			const data = await fetchJson<{
+				events: AuditEvent[];
+				chainValid?: boolean;
+				hasMore?: boolean;
+			}>(`/api/audit?limit=${AUDIT_PAGE_SIZE}&offset=${offset}&verify=${reset ? 1 : 0}`);
+			auditEvents = reset ? data.events : [...auditEvents, ...data.events];
+			auditOffset = offset + data.events.length;
+			auditHasMore = Boolean(data.hasMore);
+			if (reset) {
+				auditChainValid = typeof data.chainValid === 'boolean' ? data.chainValid : null;
+			}
+		} finally {
+			auditLoading = false;
+		}
 	}
 
 	function parseSseFrame(frame: string): { type: string; token?: string; metadata?: Record<string, unknown> } | null {
@@ -369,7 +389,7 @@
 			generating = false;
 			streamingText = '';
 			await loadConversations();
-			await loadAudit();
+			await loadAudit({ reset: true });
 		}
 	}
 
@@ -405,7 +425,7 @@
 			});
 			prompt = '';
 			await openConversation(activeConversationId, false);
-			await loadAudit();
+			await loadAudit({ reset: true });
 		} catch (error) {
 			errorMessage = error instanceof Error ? error.message : 'Failed to generate image';
 		} finally {
@@ -750,6 +770,16 @@
 			</section>
 
 			<AuditTimeline events={auditEvents} chainValid={auditChainValid} />
+			<div class="audit-controls">
+				<button type="button" onclick={() => loadAudit({ reset: true })} disabled={auditLoading}>
+					{auditLoading ? 'Refreshing…' : 'Refresh audit'}
+				</button>
+				{#if auditHasMore}
+					<button type="button" onclick={() => loadAudit({ reset: false })} disabled={auditLoading}>
+						{auditLoading ? 'Loading…' : 'Load older events'}
+					</button>
+				{/if}
+			</div>
 		</aside>
 
 		{#if isMobileViewport && (sidebarOpen || rightRailOpen)}
@@ -1031,6 +1061,13 @@
 		display: flex;
 		gap: 0.4rem;
 		margin-top: 0.45rem;
+	}
+
+	.audit-controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.45rem;
+		margin-top: 0.65rem;
 	}
 
 	.right-rail-mobile-header {
