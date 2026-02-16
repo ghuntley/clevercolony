@@ -1,6 +1,7 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { isProviderCompatibleWithModel } from '$lib/model-provider';
+import { MAX_IMAGE_PROMPT_CHARS, isPromptWithinLimit } from '$lib/request-limits';
 import { addMessage, createImageAsset, getConversationById } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { DEFAULT_IMAGE_MODEL, getModelById } from '$lib/server/models';
@@ -23,6 +24,9 @@ export const POST: RequestHandler = async (event) => {
 	}
 	if (!prompt) {
 		throw error(400, 'prompt is required');
+	}
+	if (!isPromptWithinLimit(prompt, MAX_IMAGE_PROMPT_CHARS)) {
+		throw error(400, `prompt exceeds ${MAX_IMAGE_PROMPT_CHARS} characters`);
 	}
 	const conversation = await getConversationById(env.DB, body.conversationId);
 	if (!conversation) {

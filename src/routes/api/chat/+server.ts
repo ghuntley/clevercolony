@@ -1,6 +1,7 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { isProviderCompatibleWithModel } from '$lib/model-provider';
+import { MAX_TEXT_PROMPT_CHARS, isPromptWithinLimit } from '$lib/request-limits';
 import {
 	addMessage,
 	getConversationById,
@@ -33,6 +34,9 @@ export const POST: RequestHandler = async (event) => {
 	}
 	if (!text) {
 		throw error(400, 'text is required');
+	}
+	if (!isPromptWithinLimit(text, MAX_TEXT_PROMPT_CHARS)) {
+		throw error(400, `text exceeds ${MAX_TEXT_PROMPT_CHARS} characters`);
 	}
 	const conversation = await getConversationById(env.DB, conversationId);
 	if (!conversation) {

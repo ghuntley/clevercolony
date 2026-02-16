@@ -6,6 +6,7 @@
 	import { groupConversationsByRecency } from '$lib/conversation-groups';
 	import { sortConversations } from '$lib/conversation-sort';
 	import { getModelOptionLabel } from '$lib/model-presentation';
+	import { MAX_IMAGE_PROMPT_CHARS, MAX_TEXT_PROMPT_CHARS } from '$lib/request-limits';
 	import type { AuditEvent, ChatMessage, Conversation, MemoryRecord, ModelDefinition } from '$lib/types';
 
 	type Mode = 'chat' | 'image';
@@ -56,6 +57,7 @@
 	const canSubmitPrompt = $derived(!generating && Boolean(activeConversationId) && prompt.trim().length > 0);
 	const canCreateMemory = $derived(newMemoryText.trim().length > 0);
 	const canSaveMemoryEdit = $derived(editingMemoryText.trim().length > 0);
+	const promptLimit = $derived(mode === 'chat' ? MAX_TEXT_PROMPT_CHARS : MAX_IMAGE_PROMPT_CHARS);
 
 	function scrollMessagesToBottom() {
 		if (!messagesContainer) return;
@@ -735,6 +737,7 @@
 				<textarea
 					bind:value={prompt}
 					rows="4"
+					maxlength={promptLimit}
 					placeholder={mode === 'chat'
 						? 'Ask anything (Enter to send, Shift+Enter newline)'
 						: 'Describe the image you want to generate'}
@@ -745,6 +748,7 @@
 						}
 					}}
 				></textarea>
+				<p class="composer-count">{prompt.length}/{promptLimit}</p>
 				<button type="submit" disabled={!canSubmitPrompt}>
 					{generating ? 'Working…' : mode === 'chat' ? 'Send' : 'Generate image'}
 				</button>
@@ -1058,6 +1062,13 @@
 	.composer {
 		display: grid;
 		gap: 0.5rem;
+	}
+
+	.composer-count {
+		margin: 0;
+		font-size: 0.82rem;
+		opacity: 0.78;
+		text-align: right;
 	}
 
 	.error {
