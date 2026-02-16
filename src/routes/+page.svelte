@@ -515,7 +515,11 @@
 							<button type="button" class="title" onclick={() => openConversation(conversation.id)}>
 								{conversation.title}
 							</button>
-							<button type="button" onclick={() => togglePin(conversation.id, conversation.isPinned)}>★</button>
+							<div class="row-actions">
+								<button type="button" onclick={() => renameConversation(conversation.id)}>✎</button>
+								<button type="button" onclick={() => togglePin(conversation.id, conversation.isPinned)}>★</button>
+								<button type="button" onclick={() => removeConversation(conversation.id)}>⌫</button>
+							</div>
 						</div>
 					{/each}
 				</section>
