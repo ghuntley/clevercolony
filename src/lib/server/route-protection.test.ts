@@ -7,6 +7,8 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/_app/immutable/chunk.js')).toBe(true);
 		expect(isUnprotectedPath('/favicon.ico')).toBe(true);
 		expect(isUnprotectedPath('/robots.txt')).toBe(true);
+		expect(isUnprotectedPath('/manifest.webmanifest')).toBe(true);
+		expect(isUnprotectedPath('/site.webmanifest')).toBe(true);
 	});
 
 	it('allows auth and health APIs without session', () => {
@@ -23,5 +25,7 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/api/conversations')).toBe(false);
 		expect(isUnprotectedPath('/api/authz/login')).toBe(false);
 		expect(isUnprotectedPath('/api/healthcheck')).toBe(false);
+		expect(isUnprotectedPath('/favicon-admin')).toBe(false);
+		expect(isUnprotectedPath('/robots.txt/extra')).toBe(false);
 	});
 });

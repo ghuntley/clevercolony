@@ -1,5 +1,12 @@
-const UNPROTECTED_PATHS = new Set<string>(['/login']);
+const UNPROTECTED_PATHS = new Set<string>([
+	'/login',
+	'/robots.txt',
+	'/favicon.ico',
+	'/manifest.webmanifest',
+	'/site.webmanifest'
+]);
 const UNPROTECTED_API_PREFIXES = ['/api/auth', '/api/health'];
+const UNPROTECTED_PREFIXES = ['/_app/'];
 
 function matchesPrefixPath(pathname: string, prefix: string): boolean {
 	return pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -7,8 +14,6 @@ function matchesPrefixPath(pathname: string, prefix: string): boolean {
 
 export function isUnprotectedPath(pathname: string): boolean {
 	if (UNPROTECTED_PATHS.has(pathname)) return true;
-	if (pathname.startsWith('/_app/')) return true;
-	if (pathname.startsWith('/favicon')) return true;
-	if (pathname === '/robots.txt') return true;
+	if (UNPROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
 	return UNPROTECTED_API_PREFIXES.some((prefix) => matchesPrefixPath(pathname, prefix));
 }
