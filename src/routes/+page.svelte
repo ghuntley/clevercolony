@@ -29,6 +29,7 @@
 	let auditEvents = $state<AuditEvent[]>([]);
 	let auditChainValid = $state<boolean | null>(null);
 	let streamingText = $state('');
+	let messagesContainer = $state<HTMLElement | null>(null);
 
 	const filteredConversations = $derived(
 		conversations.filter((conversation) =>
@@ -39,6 +40,14 @@
 	const pinnedConversations = $derived(filteredConversations.filter((conversation) => conversation.isPinned));
 	const regularConversations = $derived(filteredConversations.filter((conversation) => !conversation.isPinned));
 	const activeConversation = $derived(conversations.find((conversation) => conversation.id === activeConversationId) ?? null);
+	const canSubmitPrompt = $derived(!generating && Boolean(activeConversationId) && prompt.trim().length > 0);
+	const canCreateMemory = $derived(newMemoryText.trim().length > 0);
+	const canSaveMemoryEdit = $derived(editingMemoryText.trim().length > 0);
+
+	function scrollMessagesToBottom() {
+		if (!messagesContainer) return;
+		messagesContainer.scrollTop = messagesContainer.scrollHeight;
+	}
 
 	$effect(() => {
 		const availableModels = models.filter((model) => (mode === 'chat' ? model.modality === 'text' : model.modality === 'image'));
@@ -88,6 +97,7 @@
 		activeConversationId = conversationId;
 		const data = await fetchJson<{ messages: ChatMessage[] }>(`/api/conversations/${conversationId}`);
 		messages = data.messages;
+		queueMicrotask(scrollMessagesToBottom);
 		if (syncModel) {
 			const conversation = conversations.find((item) => item.id === conversationId);
 			if (conversation) {
@@ -249,6 +259,7 @@
 
 	function appendMessage(message: ChatMessage) {
 		messages = [...messages, message];
+		queueMicrotask(scrollMessagesToBottom);
 	}
 
 	async function sendChatPrompt() {
@@ -301,6 +312,7 @@
 					if (!data) continue;
 					if (data.type === 'token' && data.token) {
 						streamingText += data.token;
+						queueMicrotask(scrollMessagesToBottom);
 					}
 					if (data.type === 'done') {
 						doneMetadata = data.metadata ?? null;
@@ -343,6 +355,12 @@
 			await loadAudit();
 		}
 	}
+
+	$effect(() => {
+		streamingText;
+		if (!streamingText) return;
+		queueMicrotask(scrollMessagesToBottom);
+	});
 
 	async function sendImagePrompt() {
 		if (!activeConversationId || !prompt.trim()) return;
@@ -518,7 +536,7 @@
 				</div>
 			</header>
 
-			<section class="messages">
+			<section class="messages" bind:this={messagesContainer}>
 				{#if messages.length === 0}
 					<p class="empty">Start a new chat and send a prompt.</p>
 				{/if}
@@ -583,7 +601,7 @@
 						}
 					}}
 				></textarea>
-				<button type="submit" disabled={generating || !activeConversationId}>
+				<button type="submit" disabled={!canSubmitPrompt}>
 					{generating ? 'Working…' : mode === 'chat' ? 'Send' : 'Generate image'}
 				</button>
 			</form>
@@ -600,7 +618,7 @@
 				</header>
 				<div class="memory-create">
 					<textarea bind:value={newMemoryText} rows="3" placeholder="Remember this…"></textarea>
-					<button type="button" onclick={createMemory}>Add memory</button>
+					<button type="button" onclick={createMemory} disabled={!canCreateMemory}>Add memory</button>
 				</div>
 				<ul>
 					{#each memories as memory (memory.id)}
@@ -608,7 +626,7 @@
 							{#if editingMemoryId === memory.id}
 								<textarea bind:value={editingMemoryText} rows="3"></textarea>
 								<div class="memory-actions">
-									<button type="button" onclick={saveMemoryEdit}>Save</button>
+									<button type="button" onclick={saveMemoryEdit} disabled={!canSaveMemoryEdit}>Save</button>
 									<button
 										type="button"
 										onclick={() => {
