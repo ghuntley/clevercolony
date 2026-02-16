@@ -1,5 +1,4 @@
 <script lang="ts">
-	import mermaid from 'mermaid';
 	import { onMount } from 'svelte';
 
 	interface Props {
@@ -13,10 +12,12 @@
 
 	onMount(async () => {
 		try {
+			const { default: mermaid } = await import('mermaid');
+			const isLight = document.documentElement.dataset.theme === 'light';
 			mermaid.initialize({
 				startOnLoad: false,
 				securityLevel: 'strict',
-				theme: 'dark'
+				theme: isLight ? 'default' : 'dark'
 			});
 			const id = `mermaid-${crypto.randomUUID()}`;
 			const rendered = await mermaid.render(id, source);
