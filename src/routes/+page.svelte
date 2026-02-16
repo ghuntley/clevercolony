@@ -3,6 +3,7 @@
 	import MarkdownMessage from '$lib/components/MarkdownMessage.svelte';
 	import MermaidDiagram from '$lib/components/MermaidDiagram.svelte';
 	import AuditTimeline from '$lib/components/AuditTimeline.svelte';
+	import { groupConversationsByRecency } from '$lib/conversation-groups';
 	import type { AuditEvent, ChatMessage, Conversation, MemoryRecord, ModelDefinition } from '$lib/types';
 
 	type Mode = 'chat' | 'image';
@@ -42,6 +43,7 @@
 
 	const pinnedConversations = $derived(filteredConversations.filter((conversation) => conversation.isPinned));
 	const regularConversations = $derived(filteredConversations.filter((conversation) => !conversation.isPinned));
+	const regularConversationGroups = $derived(groupConversationsByRecency(regularConversations));
 	const activeConversation = $derived(conversations.find((conversation) => conversation.id === activeConversationId) ?? null);
 	const canSubmitPrompt = $derived(!generating && Boolean(activeConversationId) && prompt.trim().length > 0);
 	const canCreateMemory = $derived(newMemoryText.trim().length > 0);
@@ -516,22 +518,29 @@
 
 			<section>
 				<h2>Chats</h2>
-				{#each regularConversations as conversation (conversation.id)}
-					<div class="conversation-row {activeConversationId === conversation.id ? 'active' : ''}">
-						<input
-							type="checkbox"
-							checked={selectedConversationIds.includes(conversation.id)}
-							onchange={() => toggleBulkSelection(conversation.id)}
-						/>
-						<button type="button" class="title" onclick={() => openConversation(conversation.id)}>
-							{conversation.title}
-						</button>
-						<div class="row-actions">
-							<button type="button" onclick={() => renameConversation(conversation.id)}>✎</button>
-							<button type="button" onclick={() => togglePin(conversation.id, conversation.isPinned)}>☆</button>
-							<button type="button" onclick={() => removeConversation(conversation.id)}>⌫</button>
-						</div>
+				{#each regularConversationGroups as group (group.label)}
+					<div class="conversation-group">
+						<h3>{group.label}</h3>
+						{#each group.conversations as conversation (conversation.id)}
+							<div class="conversation-row {activeConversationId === conversation.id ? 'active' : ''}">
+								<input
+									type="checkbox"
+									checked={selectedConversationIds.includes(conversation.id)}
+									onchange={() => toggleBulkSelection(conversation.id)}
+								/>
+								<button type="button" class="title" onclick={() => openConversation(conversation.id)}>
+									{conversation.title}
+								</button>
+								<div class="row-actions">
+									<button type="button" onclick={() => renameConversation(conversation.id)}>✎</button>
+									<button type="button" onclick={() => togglePin(conversation.id, conversation.isPinned)}>☆</button>
+									<button type="button" onclick={() => removeConversation(conversation.id)}>⌫</button>
+								</div>
+							</div>
+						{/each}
 					</div>
+				{:else}
+					<p class="sidebar-empty">No chats found.</p>
 				{/each}
 			</section>
 
@@ -841,6 +850,18 @@
 		align-items: center;
 		gap: 0.35rem;
 		margin-bottom: 0.35rem;
+	}
+
+	.conversation-group h3 {
+		margin: 0.55rem 0;
+		font-size: 0.85rem;
+		opacity: 0.82;
+	}
+
+	.sidebar-empty {
+		margin: 0.5rem 0;
+		opacity: 0.8;
+		font-size: 0.9rem;
 	}
 
 	.conversation-row.active {
