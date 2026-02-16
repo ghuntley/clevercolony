@@ -10,6 +10,7 @@ describe('isUnprotectedPath', () => {
 	});
 
 	it('allows auth and health APIs without session', () => {
+		expect(isUnprotectedPath('/api/auth')).toBe(true);
 		expect(isUnprotectedPath('/api/auth/login')).toBe(true);
 		expect(isUnprotectedPath('/api/auth/logout')).toBe(true);
 		expect(isUnprotectedPath('/api/health')).toBe(true);
@@ -20,5 +21,7 @@ describe('isUnprotectedPath', () => {
 		expect(isUnprotectedPath('/api/chat')).toBe(false);
 		expect(isUnprotectedPath('/api/audit')).toBe(false);
 		expect(isUnprotectedPath('/api/conversations')).toBe(false);
+		expect(isUnprotectedPath('/api/authz/login')).toBe(false);
+		expect(isUnprotectedPath('/api/healthcheck')).toBe(false);
 	});
 });
