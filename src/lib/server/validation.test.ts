@@ -169,6 +169,42 @@ describe('parseSearchParams', () => {
 		).toThrow();
 	});
 
+	it('parses optional audit filter params', () => {
+		const parsed = parseSearchParams(
+			new URLSearchParams([
+				['actionType', 'prompt.submit'],
+				['conversationId', 'conv_abc'],
+				['conversationQuery', 'conv_'],
+				['dateFrom', '2026-02-01'],
+				['dateTo', '2026-02-10'],
+				['verify', '1']
+			]),
+			auditQuerySchema
+		);
+		expect(parsed).toMatchObject({
+			actionType: 'prompt.submit',
+			conversationId: 'conv_abc',
+			conversationQuery: 'conv_',
+			dateFrom: '2026-02-01',
+			dateTo: '2026-02-10',
+			verify: true
+		});
+	});
+
+	it('rejects invalid audit date formats', () => {
+		expect(() =>
+			parseSearchParams(new URLSearchParams([['dateFrom', '2026/02/01']]), auditQuerySchema)
+		).toThrow();
+		try {
+			parseSearchParams(new URLSearchParams([['dateFrom', '2026/02/01']]), auditQuerySchema);
+		} catch (thrown) {
+			expect(thrown).toMatchObject({
+				status: 400,
+				body: { message: 'dateFrom must be YYYY-MM-DD' }
+			});
+		}
+	});
+
 	it('rejects invalid audit pagination params', () => {
 		expect(() => parseSearchParams(new URLSearchParams([['limit', '0']]), auditQuerySchema)).toThrow();
 		try {
