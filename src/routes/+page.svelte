@@ -51,6 +51,7 @@
 	const pinnedConversations = $derived(filteredConversations.filter((conversation) => conversation.isPinned));
 	const regularConversations = $derived(filteredConversations.filter((conversation) => !conversation.isPinned));
 	const regularConversationGroups = $derived(groupConversationsByRecency(regularConversations));
+	const visibleConversationOrder = $derived([...pinnedConversations, ...regularConversations]);
 	const activeConversation = $derived(conversations.find((conversation) => conversation.id === activeConversationId) ?? null);
 	const canSubmitPrompt = $derived(!generating && Boolean(activeConversationId) && prompt.trim().length > 0);
 	const canCreateMemory = $derived(newMemoryText.trim().length > 0);
@@ -64,6 +65,27 @@
 	function closeMobilePanels() {
 		sidebarOpen = false;
 		rightRailOpen = false;
+	}
+
+	function shouldIgnoreKeyboardShortcut(target: EventTarget | null): boolean {
+		if (!(target instanceof HTMLElement)) return false;
+		return (
+			target.tagName === 'INPUT' ||
+			target.tagName === 'TEXTAREA' ||
+			target.tagName === 'SELECT' ||
+			target.isContentEditable
+		);
+	}
+
+	function switchConversationByOffset(offset: number) {
+		if (!activeConversationId || visibleConversationOrder.length < 2) return;
+		const index = visibleConversationOrder.findIndex((conversation) => conversation.id === activeConversationId);
+		if (index < 0) return;
+		const nextIndex = (index + offset + visibleConversationOrder.length) % visibleConversationOrder.length;
+		const nextConversation = visibleConversationOrder[nextIndex];
+		if (nextConversation && nextConversation.id !== activeConversationId) {
+			void openConversation(nextConversation.id);
+		}
 	}
 
 	$effect(() => {
@@ -475,7 +497,18 @@
 				closeMobilePanels();
 				return;
 			}
+			if (shouldIgnoreKeyboardShortcut(event.target)) return;
 			const isModifier = event.ctrlKey || event.metaKey;
+			if (isModifier && event.shiftKey && event.key === 'ArrowUp') {
+				event.preventDefault();
+				switchConversationByOffset(-1);
+				return;
+			}
+			if (isModifier && event.shiftKey && event.key === 'ArrowDown') {
+				event.preventDefault();
+				switchConversationByOffset(1);
+				return;
+			}
 			if (isModifier && event.shiftKey && event.key.toLowerCase() === 'o') {
 				event.preventDefault();
 				void createConversation();
@@ -697,7 +730,7 @@
 					event.preventDefault();
 					void handleSubmit();
 				}}
-				title="Enter to send · Shift+Enter newline · Ctrl/Cmd+Shift+O new chat"
+				title="Enter to send · Shift+Enter newline · Ctrl/Cmd+Shift+O new chat · Ctrl/Cmd+Shift+↑/↓ switch thread"
 			>
 				<textarea
 					bind:value={prompt}
