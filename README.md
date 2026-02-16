@@ -59,6 +59,12 @@ Configure these in Cloudflare Pages project settings (and locally through Wrangl
 - `SERPER_API_KEY` (required when web search toggle is used)
 - `CF_ACCOUNT_ID` + `CF_API_TOKEN` (optional fallback path for Workers AI REST usage)
 
+You can start from the checked-in template:
+
+```bash
+cp .env.example .env
+```
+
 ### Password hash format
 
 Password hash format is:
@@ -68,6 +74,12 @@ pbkdf2_sha256$<iterations>$<salt-base64url>$<digest-base64url>
 ```
 
 Use PBKDF2-SHA256 with at least `100000` iterations.
+
+Generate a compatible hash quickly:
+
+```bash
+npm run hash:password -- "your-shared-password"
+```
 
 ## Cloudflare bindings
 
