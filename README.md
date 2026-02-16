@@ -55,6 +55,12 @@ Build app:
 npm run build
 ```
 
+Run the pre-deploy smoke suite:
+
+```bash
+npm run test:smoke
+```
+
 ## Environment variables
 
 Configure these in Cloudflare Pages project settings (and locally through Wrangler where needed):
