@@ -17,6 +17,7 @@ const memoryContentSchema = z
 	.min(1, 'Memory content is required')
 	.max(4000, 'Memory content is too long');
 const optionalConversationIdSchema = z.string().trim().min(1, 'conversationId cannot be empty').max(128).nullable().optional();
+const resourceIdSchema = z.string().trim().min(1, 'id is required').max(128, 'id is too long');
 
 export const chatRequestSchema = z.object({
 	conversationId: conversationIdSchema,
@@ -130,6 +131,14 @@ export const auditQuerySchema = z.object({
 	actionType: z.string().trim().min(1, 'actionType cannot be empty').max(120, 'actionType is too long').optional(),
 	conversationId: z.string().trim().min(1, 'conversationId cannot be empty').max(128, 'conversationId is too long').optional(),
 	verify: z.preprocess((value) => value === '1', z.boolean())
+});
+
+export const memoryListQuerySchema = z.object({
+	conversationId: z.string().trim().min(1, 'conversationId cannot be empty').max(128, 'conversationId is too long').optional()
+});
+
+export const memoryDeleteQuerySchema = z.object({
+	id: resourceIdSchema
 });
 
 export async function parseJsonBody<TSchema extends z.ZodTypeAny>(

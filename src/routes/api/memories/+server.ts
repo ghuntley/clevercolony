@@ -1,15 +1,29 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
-import { createMemory, deleteMemory, getConversationById, listMemories, updateMemory } from '$lib/server/db';
+import { createMemory, deleteMemory, getConversationById, getMemoryById, listMemories, updateMemory } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { created, ok } from '$lib/server/http';
-import { createMemoryRequestSchema, parseJsonBody, updateMemoryRequestSchema } from '$lib/server/validation';
+import {
+	createMemoryRequestSchema,
+	memoryDeleteQuerySchema,
+	memoryListQuerySchema,
+	parseJsonBody,
+	parseSearchParams,
+	updateMemoryRequestSchema
+} from '$lib/server/validation';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const conversationId = event.url.searchParams.get('conversationId');
+	const query = parseSearchParams(event.url.searchParams, memoryListQuerySchema);
+	const conversationId = query.conversationId;
+	if (conversationId) {
+		const conversation = await getConversationById(env.DB, conversationId);
+		if (!conversation) {
+			throw error(404, 'Conversation not found');
+		}
+	}
 	const memories = await listMemories(env.DB, {
 		conversationId
 	});
@@ -86,17 +100,22 @@ export const PATCH: RequestHandler = async (event) => {
 export const DELETE: RequestHandler = async (event) => {
 	assertAuthenticatedApi(event);
 	const env = getEnv(event);
-	const id = event.url.searchParams.get('id')?.trim();
-	if (!id) {
-		throw error(400, 'Memory id is required');
+	const query = parseSearchParams(event.url.searchParams, memoryDeleteQuerySchema);
+	const existing = await getMemoryById(env.DB, query.id);
+	if (!existing) {
+		throw error(404, 'Memory not found');
 	}
-	await deleteMemory(env.DB, id);
+	await deleteMemory(env.DB, query.id);
 
 	await logAuditEvent({
 		db: env.DB,
 		sessionId: event.locals.sessionId!,
+		conversationId: existing.conversationId,
 		actionType: 'memory.delete',
-		payload: { id }
+		payload: {
+			id: existing.id,
+			scope: existing.scope
+		}
 	});
 	return ok({ deleted: true });
 };

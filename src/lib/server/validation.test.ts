@@ -6,6 +6,8 @@ import {
 	createMemoryRequestSchema,
 	imageRequestSchema,
 	loginRequestSchema,
+	memoryDeleteQuerySchema,
+	memoryListQuerySchema,
 	parseJsonBody,
 	parseSearchParams,
 	updateConversationRequestSchema,
@@ -164,5 +166,17 @@ describe('parseSearchParams', () => {
 				body: { message: 'limit must be >= 1' }
 			});
 		}
+	});
+
+	it('parses memory list query params', () => {
+		const parsed = parseSearchParams(
+			new URLSearchParams([['conversationId', 'conv_123']]),
+			memoryListQuerySchema
+		);
+		expect(parsed).toMatchObject({ conversationId: 'conv_123' });
+	});
+
+	it('requires memory id in delete query', () => {
+		expect(() => parseSearchParams(new URLSearchParams(), memoryDeleteQuerySchema)).toThrow();
 	});
 });

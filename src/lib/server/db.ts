@@ -391,6 +391,18 @@ export async function createMemory(
 	};
 }
 
+export async function getMemoryById(db: D1Database, id: string): Promise<MemoryRecord | null> {
+	const row = await db
+		.prepare(
+			`SELECT id, scope, conversation_id, content, tags_json, score, created_at, updated_at
+       FROM memories WHERE id = ?1`
+		)
+		.bind(id)
+		.first<MemoryRow>();
+	if (!row) return null;
+	return toMemory(row);
+}
+
 export async function updateMemory(
 	db: D1Database,
 	input: {
