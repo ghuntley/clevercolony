@@ -94,6 +94,11 @@ async function run() {
 			typeof healthBody.timestamp === 'number' && Number.isFinite(healthBody.timestamp),
 			'Expected /api/health payload to include numeric timestamp'
 		);
+		const healthSubpathResponse = await fetch(`${baseUrl}/api/health/ready`, { redirect: 'manual' });
+		assert(
+			healthSubpathResponse.status === 401,
+			`Expected /api/health/ready to stay protected with 401, got ${healthSubpathResponse.status}`
+		);
 
 		const rootResponse = await fetch(`${baseUrl}/`, { redirect: 'manual' });
 		assert(rootResponse.status === 303, `Expected / to redirect with 303, got ${rootResponse.status}`);
