@@ -1,5 +1,5 @@
 import type { AuditEvent, ChatMessage, Conversation, MemoryRecord } from '$lib/types';
-import { generateAuditHash } from '$lib/server/crypto';
+import { computeAuditEventHash, verifyAuditChainEntries } from '$lib/server/audit-chain';
 
 interface ConversationRow {
 	id: string;
@@ -510,7 +510,7 @@ export async function appendAuditEvent(
 	const prevHash = previous?.event_hash ?? 'GENESIS';
 	const createdAt = Date.now();
 	const payloadJson = JSON.stringify(input.payload);
-	const eventHash = await generateAuditHash({
+	const eventHash = await computeAuditEventHash({
 		prevHash,
 		id: input.id,
 		createdAt,
@@ -561,29 +561,16 @@ export async function verifyAuditChain(db: D1Database): Promise<boolean> {
        ORDER BY created_at ASC`
 		)
 		.all<AuditEventRow>();
-	const rows = result.results ?? [];
-	let previousHash = 'GENESIS';
-
-	for (const row of rows) {
-		if (row.prev_hash !== previousHash) {
-			return false;
-		}
-
-		const recomputed = await generateAuditHash({
-			prevHash: row.prev_hash,
-			id: row.id,
-			createdAt: row.created_at,
-			actorSessionId: row.actor_session_id,
-			conversationId: row.conversation_id,
-			actionType: row.action_type,
-			payloadJson: row.payload_json,
-			promptText: row.prompt_text
-		});
-		if (recomputed !== row.event_hash) {
-			return false;
-		}
-		previousHash = row.event_hash;
-	}
-
-	return true;
+	const entries = (result.results ?? []).map((row) => ({
+		id: row.id,
+		createdAt: row.created_at,
+		actorSessionId: row.actor_session_id,
+		conversationId: row.conversation_id,
+		actionType: row.action_type,
+		payloadJson: row.payload_json,
+		promptText: row.prompt_text,
+		prevHash: row.prev_hash,
+		eventHash: row.event_hash
+	}));
+	return verifyAuditChainEntries(entries);
 }
