@@ -61,6 +61,12 @@ Run the pre-deploy smoke suite:
 npm run test:smoke
 ```
 
+Run the full release smoke suite (includes Storybook production build):
+
+```bash
+npm run test:smoke:full
+```
+
 ## Environment variables
 
 Configure these in Cloudflare Pages project settings (and locally through Wrangler where needed):

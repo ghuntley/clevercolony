@@ -13,6 +13,7 @@
 		"test": "npm run test:unit",
 		"test:unit": "vitest run --config vitest.unit.config.ts",
 		"test:smoke": "npm test && npm run check && npm run build",
+		"test:smoke:full": "npm run test:smoke && npm run build-storybook",
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build",
 		"hash:password": "node scripts/hash-password.mjs"
