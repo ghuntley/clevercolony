@@ -73,6 +73,12 @@ Run production preview smoke checks (local build + preview route/auth probes):
 npm run test:preview
 ```
 
+Run functional preview API checks (local build + auth/conversation/memory/audit CRUD flow):
+
+```bash
+npm run test:functional:preview
+```
+
 Run full release validation bundle (smoke + Storybook + preview probes):
 
 ```bash

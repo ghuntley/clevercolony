@@ -1,33 +1,22 @@
-import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import process from 'node:process';
 import { applyLocalD1Migrations } from './local-d1.mjs';
 import { startPreviewServer, stopPreviewServer } from './preview-runtime.mjs';
 import { runSmokeProbes } from './smoke-probes.mjs';
-
-function toBase64Url(bytes) {
-	return Buffer.from(bytes)
-		.toString('base64')
-		.replace(/\+/g, '-')
-		.replace(/\//g, '_')
-		.replace(/=+$/g, '');
-}
-
-function buildPasswordHash(password, iterations = 210_000) {
-	const salt = randomBytes(16);
-	const digest = pbkdf2Sync(password, salt, iterations, 32, 'sha256');
-	return `pbkdf2_sha256$${iterations}$${toBase64Url(salt)}$${toBase64Url(digest)}`;
-}
+import {
+	PREVIEW_TEST_PASSWORD,
+	PREVIEW_TEST_SESSION_SECRET,
+	buildPasswordHash
+} from './test-auth-credentials.mjs';
 
 async function run() {
 	await applyLocalD1Migrations();
 
-	const testPassword = 'preview-smoke-password';
+	const testPassword = PREVIEW_TEST_PASSWORD;
 	const testPasswordHash = buildPasswordHash(testPassword);
-	const sessionSecret = 'preview-smoke-session-secret';
 	const preview = await startPreviewServer({
 		extraEnv: {
 			APP_ACCESS_PASSWORD_HASH: testPasswordHash,
-			APP_SESSION_SECRET: sessionSecret
+			APP_SESSION_SECRET: PREVIEW_TEST_SESSION_SECRET
 		}
 	});
 
