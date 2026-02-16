@@ -626,6 +626,7 @@
 						{#if message.contentType === 'text'}
 							<MarkdownMessage content={message.content} />
 							{@const citations = (message.metadata?.citations ?? []) as Array<{ title: string; url: string }>}
+							{@const webSearchStatus = (message.metadata?.webSearchStatus ?? '') as string}
 							{#if citations.length}
 								<footer>
 									<strong>Sources</strong>
@@ -635,6 +636,10 @@
 										{/each}
 									</ul>
 								</footer>
+							{:else if webSearchStatus === 'missing_api_key'}
+								<p class="status-note">Web search skipped: SERPER_API_KEY is not configured.</p>
+							{:else if webSearchStatus === 'error'}
+								<p class="status-note">Web search unavailable for this response.</p>
 							{/if}
 						{:else if message.contentType === 'image'}
 							<p>{message.content}</p>
@@ -964,6 +969,12 @@
 	.message ul {
 		margin: 0.4rem 0 0;
 		padding-left: 1.3rem;
+	}
+
+	.status-note {
+		margin: 0.6rem 0 0;
+		opacity: 0.82;
+		font-size: 0.88rem;
 	}
 
 	.message img {

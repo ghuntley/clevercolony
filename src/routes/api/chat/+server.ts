@@ -1,11 +1,11 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
 import { logAuditEvent } from '$lib/server/audit';
 import { addMessage, listMemories, listMessages, maybeAutoTitleConversationFromMessage } from '$lib/server/db';
-import { getEnv, requireEnv } from '$lib/server/env';
+import { getEnv } from '$lib/server/env';
 import { DEFAULT_TEXT_MODEL, getModelById } from '$lib/server/models';
 import { generateTextResponse } from '$lib/server/providers';
-import { runSerperSearch } from '$lib/server/serper';
 import { createTextSseStream } from '$lib/server/sse';
+import { maybeRunWebSearch } from '$lib/server/web-search';
 import { error, type RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async (event) => {
@@ -79,14 +79,13 @@ export const POST: RequestHandler = async (event) => {
 		promptText: text
 	});
 
-	let citations: Awaited<ReturnType<typeof runSerperSearch>> = [];
-	if (body.webSearchEnabled) {
-		citations = await runSerperSearch({
-			apiKey: requireEnv(env.SERPER_API_KEY, 'SERPER_API_KEY'),
-			query: text,
-			num: 5
-		});
-	}
+	const webSearchResult = await maybeRunWebSearch({
+		enabled: Boolean(body.webSearchEnabled),
+		apiKey: env.SERPER_API_KEY,
+		query: text,
+		maxResults: 5
+	});
+	const citations = webSearchResult.citations;
 
 	const messageHistory = await listMessages(env.DB, conversationId);
 	const memories = await listMemories(env.DB, { conversationId });
@@ -108,7 +107,8 @@ export const POST: RequestHandler = async (event) => {
 		metadata: {
 			citations,
 			model: selectedModelId,
-			provider
+			provider,
+			webSearchStatus: webSearchResult.status
 		}
 	});
 
@@ -131,7 +131,8 @@ export const POST: RequestHandler = async (event) => {
 		payload: {
 			assistantMessageId: assistantMessage.id,
 			citationCount: citations.length,
-			hasDiagram: Boolean(response.diagram)
+			hasDiagram: Boolean(response.diagram),
+			webSearchStatus: webSearchResult.status
 		}
 	});
 
@@ -140,7 +141,8 @@ export const POST: RequestHandler = async (event) => {
 		metadata: {
 			messageId: assistantMessage.id,
 			citations,
-			diagram: response.diagram
+			diagram: response.diagram,
+			webSearchStatus: webSearchResult.status
 		}
 	});
 
