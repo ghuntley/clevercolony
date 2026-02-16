@@ -1,0 +1,10 @@
+{
+	"name": "Clever Colony",
+	"short_name": "CleverColony",
+	"description": "Monospace-native Cloudflare chat workspace with model, memory, and audit controls.",
+	"start_url": "/login",
+	"display": "standalone",
+	"background_color": "#0f0f0f",
+	"theme_color": "#0f0f0f",
+	"icons": []
+}
