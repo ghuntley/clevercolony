@@ -171,6 +171,18 @@ npm run test:smoke
 - Oversized/invalid Mermaid payloads are rejected or rendered as source fallback.
 - Diagram source is available for copy/inspection in the UI.
 
+### Request validation policy
+
+- API request bodies are schema-validated server-side (Zod).
+- Provider/model mismatches are rejected.
+- Prompt limits:
+  - Chat prompts: `12000` chars max
+  - Image prompts: `4000` chars max
+- Memory limits:
+  - Content max: `4000` chars
+  - Tags max: `16` entries, `64` chars each
+  - Score range: `0` to `10`
+
 ### Audit policy
 
 - All authenticated users can view the audit trail.
