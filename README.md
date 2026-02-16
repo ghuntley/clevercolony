@@ -67,12 +67,21 @@ Run the full release smoke suite (includes Storybook production build):
 npm run test:smoke:full
 ```
 
+Run production preview smoke checks (local build + preview route/auth probes):
+
+```bash
+npm run test:preview
+```
+
 ## Continuous integration
 
 GitHub Actions runs two jobs on pushes and pull requests:
 
 - `npm run test:smoke` (unit tests + type checks + app build)
 - `npm run build-storybook`
+
+For local production checks, `npm run test:preview` runs against `vite preview` with Cloudflare
+platform bindings emulated via Wrangler local proxy mode.
 
 ## Health endpoint
 
