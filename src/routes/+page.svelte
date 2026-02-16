@@ -47,6 +47,8 @@
 	let auditConversationQuery = $state('');
 	let auditDateFrom = $state('');
 	let auditDateTo = $state('');
+	let auditAbortController: AbortController | null = null;
+	let auditResetQueued = false;
 	let streamingText = $state('');
 	let messagesContainer = $state<HTMLElement | null>(null);
 	let sidebarOpen = $state(false);
@@ -126,6 +128,13 @@
 			throw new Error(body.message ?? body.error ?? `${response.status} ${response.statusText}`);
 		}
 		return response.json() as Promise<T>;
+	}
+
+	function isAbortError(error: unknown): boolean {
+		return (
+			(error instanceof DOMException && error.name === 'AbortError') ||
+			(error instanceof Error && error.name === 'AbortError')
+		);
 	}
 
 	async function loadModels() {
@@ -292,8 +301,16 @@
 
 	async function loadAudit(options?: { reset?: boolean }) {
 		const reset = options?.reset ?? true;
-		if (auditLoading) return;
+		if (auditLoading) {
+			if (reset) {
+				auditResetQueued = true;
+				auditAbortController?.abort();
+			}
+			return;
+		}
 		auditLoading = true;
+		const controller = new AbortController();
+		auditAbortController = controller;
 		const offset = reset ? 0 : auditOffset;
 		const params = new URLSearchParams({
 			limit: String(AUDIT_PAGE_SIZE),
@@ -310,7 +327,7 @@
 				chainValid?: boolean;
 				hasMore?: boolean;
 				totalCount?: number;
-			}>(`/api/audit?${params.toString()}`);
+			}>(`/api/audit?${params.toString()}`, { signal: controller.signal });
 			auditEvents = reset ? data.events : [...auditEvents, ...data.events];
 			auditOffset = offset + data.events.length;
 			auditHasMore = Boolean(data.hasMore);
@@ -320,8 +337,20 @@
 			if (reset) {
 				auditChainValid = typeof data.chainValid === 'boolean' ? data.chainValid : null;
 			}
+		} catch (error) {
+			if (isAbortError(error)) {
+				return;
+			}
+			throw error;
 		} finally {
-			auditLoading = false;
+			if (auditAbortController === controller) {
+				auditAbortController = null;
+				auditLoading = false;
+			}
+			if (auditResetQueued && !auditLoading) {
+				auditResetQueued = false;
+				void loadAudit({ reset: true });
+			}
 		}
 	}
 
