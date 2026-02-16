@@ -2,7 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 import { readSessionId, requireSessionSecret } from '$lib/server/auth';
 
 const UNPROTECTED_PATHS = new Set<string>(['/login']);
-const UNPROTECTED_API_PREFIXES = ['/api/auth'];
+const UNPROTECTED_API_PREFIXES = ['/api/auth', '/api/health'];
 
 function isUnprotectedPath(pathname: string): boolean {
 	if (UNPROTECTED_PATHS.has(pathname)) return true;

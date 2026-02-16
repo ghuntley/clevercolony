@@ -74,6 +74,12 @@ GitHub Actions runs two jobs on pushes and pull requests:
 - `npm run test:smoke` (unit tests + type checks + app build)
 - `npm run build-storybook`
 
+## Health endpoint
+
+For deploy health checks, an unauthenticated endpoint is available:
+
+- `GET /api/health` → `{ status: "ok", timestamp }`
+
 ## Environment variables
 
 Configure these in Cloudflare Pages project settings (and locally through Wrangler where needed):
