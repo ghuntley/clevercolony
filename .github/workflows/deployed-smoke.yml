@@ -1,0 +1,52 @@
+name: Deployed Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Target deployment URL (for example https://clever-colony.pages.dev)'
+        required: true
+        type: string
+      include_authenticated_checks:
+        description: 'Also run authenticated login/logout smoke probes'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: deployed-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deployed-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unauthenticated deployed smoke probes
+        env:
+          SMOKE_BASE_URL: ${{ inputs.base_url }}
+        run: npm run test:deployed
+
+      - name: Run authenticated deployed smoke probes
+        if: ${{ inputs.include_authenticated_checks }}
+        env:
+          SMOKE_BASE_URL: ${{ inputs.base_url }}
+          SMOKE_PASSWORD: ${{ secrets.DEPLOYED_SMOKE_PASSWORD }}
+        run: |
+          if [ -z "$SMOKE_PASSWORD" ]; then
+            echo "DEPLOYED_SMOKE_PASSWORD secret is required when include_authenticated_checks=true"
+            exit 1
+          fi
+          npm run test:deployed

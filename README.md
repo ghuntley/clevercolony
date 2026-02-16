@@ -99,6 +99,12 @@ GitHub Actions runs three jobs on pushes and pull requests:
 - `npm run test:preview` (production preview auth + health probes)
 - `npm run build-storybook`
 
+There is also a manual workflow dispatch for deployed smoke verification:
+
+- **Workflow:** `Deployed Smoke`
+- **Input:** `base_url` (required)
+- **Optional input:** `include_authenticated_checks` (requires repo secret `DEPLOYED_SMOKE_PASSWORD`)
+
 For local production checks, `npm run test:preview` runs against `vite preview` with Cloudflare
 platform bindings emulated via Wrangler local proxy mode. The preview smoke checks include
 unauthenticated access guards, sitemap/manifest/robots metadata probes, login failure timing guard
@@ -206,6 +212,12 @@ npm run test:release
 
 ```bash
 SMOKE_BASE_URL="https://your-deployment.example" npm run test:deployed
+```
+
+Optional authenticated deployed probe (recommended before production cutover):
+
+```bash
+SMOKE_BASE_URL="https://your-deployment.example" SMOKE_PASSWORD="your-shared-password" npm run test:deployed
 ```
 
 ## Security posture (MVP)
