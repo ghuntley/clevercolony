@@ -79,9 +79,21 @@ Run full release validation bundle (smoke + Storybook + preview probes):
 npm run test:release
 ```
 
+Run deployed smoke probes against a live URL (unauthenticated checks only):
+
+```bash
+SMOKE_BASE_URL="https://your-deployment.example" npm run test:deployed
+```
+
+Run deployed smoke probes including authenticated login/logout flow checks:
+
+```bash
+SMOKE_BASE_URL="https://your-deployment.example" SMOKE_PASSWORD="your-shared-password" npm run test:deployed
+```
+
 ## Continuous integration
 
-GitHub Actions runs two jobs on pushes and pull requests:
+GitHub Actions runs three jobs on pushes and pull requests:
 
 - `npm run test:smoke` (unit tests + type checks + app build)
 - `npm run test:preview` (production preview auth + health probes)
@@ -96,6 +108,7 @@ chat/data APIs and allowlist-boundary regression probes for lookalike routes (fo
 `/api/authz/*`, `/api/healthcheck`, `/robots.txt/extra`), plus a probe that compiled app assets
 remain reachable via `/_app/*` while unauthenticated and similarly named non-asset paths
 (for example `/_appx/*`) remain protected.
+The same probe contract can be run against deployed environments through `npm run test:deployed`.
 
 ## Health endpoint
 
@@ -183,10 +196,16 @@ npx wrangler d1 migrations apply clever-colony --local
 npx wrangler d1 migrations apply clever-colony --remote
 ```
 
-6. Run smoke checks before shipping:
+6. Run local release checks before shipping:
 
 ```bash
-npm run test:smoke
+npm run test:release
+```
+
+7. Run deployed smoke checks against the target Pages URL before traffic cutover:
+
+```bash
+SMOKE_BASE_URL="https://your-deployment.example" npm run test:deployed
 ```
 
 ## Security posture (MVP)
