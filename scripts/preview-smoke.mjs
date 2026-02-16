@@ -113,6 +113,28 @@ async function run() {
 			'Expected /sitemap.xml to contain login URL entry for preview origin'
 		);
 
+		const manifestResponse = await fetch(`${baseUrl}/manifest.webmanifest`);
+		assert(
+			manifestResponse.status === 200,
+			`Expected /manifest.webmanifest 200, got ${manifestResponse.status}`
+		);
+		const manifestBody = await readJsonSafe(manifestResponse);
+		assert(
+			manifestBody.short_name === 'CleverColony',
+			'Expected /manifest.webmanifest to expose CleverColony short_name'
+		);
+
+		const siteManifestResponse = await fetch(`${baseUrl}/site.webmanifest`);
+		assert(
+			siteManifestResponse.status === 200,
+			`Expected /site.webmanifest 200, got ${siteManifestResponse.status}`
+		);
+		const siteManifestBody = await readJsonSafe(siteManifestResponse);
+		assert(
+			siteManifestBody.short_name === 'CleverColony',
+			'Expected /site.webmanifest to expose CleverColony short_name'
+		);
+
 		const modelsResponse = await fetch(`${baseUrl}/api/models`, { redirect: 'manual' });
 		assert(
 			modelsResponse.status === 401,
