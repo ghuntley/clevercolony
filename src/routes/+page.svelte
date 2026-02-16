@@ -277,7 +277,7 @@
 	}
 
 	async function sendChatPrompt() {
-		if (!activeConversationId || !prompt.trim()) return;
+		if (generating || !activeConversationId || !prompt.trim()) return;
 		const messageText = prompt.trim();
 		prompt = '';
 		generating = true;
@@ -386,7 +386,7 @@
 	});
 
 	async function sendImagePrompt() {
-		if (!activeConversationId || !prompt.trim()) return;
+		if (generating || !activeConversationId || !prompt.trim()) return;
 		const model = models.find((item) => item.id === selectedModelId);
 		generating = true;
 		try {
@@ -412,6 +412,7 @@
 
 	async function handleSubmit() {
 		errorMessage = '';
+		if (!canSubmitPrompt) return;
 		if (mode === 'chat') {
 			await sendChatPrompt();
 			return;
@@ -664,7 +665,7 @@
 						? 'Ask anything (Enter to send, Shift+Enter newline)'
 						: 'Describe the image you want to generate'}
 					onkeydown={(event) => {
-						if (event.key === 'Enter' && !event.shiftKey) {
+						if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
 							event.preventDefault();
 							void handleSubmit();
 						}
