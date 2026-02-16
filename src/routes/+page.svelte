@@ -4,6 +4,7 @@
 	import MermaidDiagram from '$lib/components/MermaidDiagram.svelte';
 	import AuditTimeline from '$lib/components/AuditTimeline.svelte';
 	import { groupConversationsByRecency } from '$lib/conversation-groups';
+	import { getModelOptionLabel } from '$lib/model-presentation';
 	import type { AuditEvent, ChatMessage, Conversation, MemoryRecord, ModelDefinition } from '$lib/types';
 
 	type Mode = 'chat' | 'image';
@@ -587,7 +588,7 @@
 						Model
 						<select bind:value={selectedModelId}>
 							{#each models.filter((model) => (mode === 'chat' ? model.modality === 'text' : model.modality === 'image')) as model}
-								<option value={model.id}>{model.label} · {model.provider}</option>
+								<option value={model.id}>{getModelOptionLabel(model)}</option>
 							{/each}
 						</select>
 					</label>
@@ -595,6 +596,9 @@
 						<input type="checkbox" bind:checked={webSearchEnabled} disabled={mode !== 'chat'} />
 						Web search
 					</label>
+					<button type="button" disabled title="File attachments are not enabled in this release">
+						Attachments (soon)
+					</button>
 					<button type="button" onclick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}>
 						Theme: {theme === 'dark' ? 'Dark' : 'Light'}
 					</button>
