@@ -6,6 +6,10 @@ export interface AuditFilterWhereOptions {
 	createdTo?: number | null;
 }
 
+function escapeSqlLike(value: string): string {
+	return value.replace(/[\\%_]/g, (token) => `\\${token}`);
+}
+
 export function buildAuditFilterWhere(options: AuditFilterWhereOptions) {
 	const clauses: string[] = [];
 	const bindings: Array<string | number> = [];
@@ -21,7 +25,8 @@ export function buildAuditFilterWhere(options: AuditFilterWhereOptions) {
 		clauses.push(`conversation_id = ${bindValue(options.conversationId)}`);
 	}
 	if (options.conversationQuery) {
-		clauses.push(`LOWER(COALESCE(conversation_id, '')) LIKE ${bindValue(`%${options.conversationQuery.toLowerCase()}%`)}`);
+		const escaped = escapeSqlLike(options.conversationQuery.toLowerCase());
+		clauses.push(`LOWER(COALESCE(conversation_id, '')) LIKE ${bindValue(`%${escaped}%`)} ESCAPE '\\'`);
 	}
 	if (options.createdFrom !== null && options.createdFrom !== undefined) {
 		clauses.push(`created_at >= ${bindValue(options.createdFrom)}`);

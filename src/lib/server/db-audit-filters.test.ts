@@ -25,8 +25,17 @@ describe('buildAuditFilterWhere', () => {
 			conversationQuery: 'AbC'
 		});
 
-		expect(built.whereClause).toBe(" WHERE LOWER(COALESCE(conversation_id, '')) LIKE ?1");
+		expect(built.whereClause).toBe(" WHERE LOWER(COALESCE(conversation_id, '')) LIKE ?1 ESCAPE '\\'");
 		expect(built.bindings).toEqual(['%abc%']);
+	});
+
+	it('escapes sql like wildcards in conversation query values', () => {
+		const built = buildAuditFilterWhere({
+			conversationQuery: 'conv_%\\123'
+		});
+
+		expect(built.whereClause).toBe(" WHERE LOWER(COALESCE(conversation_id, '')) LIKE ?1 ESCAPE '\\'");
+		expect(built.bindings).toEqual(['%conv\\_\\%\\\\123%']);
 	});
 
 	it('includes inclusive timestamp bounds when provided', () => {
