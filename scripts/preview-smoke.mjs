@@ -186,6 +186,25 @@ async function run() {
 			modelsBody.error === 'Authentication required',
 			`Expected /api/models 401 payload to include Authentication required message`
 		);
+		const unauthenticatedChatResponse = await fetch(`${baseUrl}/api/chat`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				conversationId: 'test-conversation',
+				provider: 'zai',
+				model: 'glm-4.7',
+				messages: [{ role: 'user', content: 'hello' }]
+			})
+		});
+		assert(
+			unauthenticatedChatResponse.status === 401,
+			`Expected unauthenticated /api/chat to return 401, got ${unauthenticatedChatResponse.status}`
+		);
+		const unauthenticatedChatBody = await readJsonSafe(unauthenticatedChatResponse);
+		assert(
+			unauthenticatedChatBody.error === 'Authentication required',
+			'Expected unauthenticated /api/chat payload to include Authentication required message'
+		);
 
 		const malformedLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
 			method: 'POST',
@@ -310,6 +329,20 @@ async function run() {
 		assert(
 			logoutSetCookie.toLowerCase().includes('clever_colony_session='),
 			'Expected /api/auth/logout to clear clever_colony_session cookie'
+		);
+		const modelsAfterLogoutResponse = await fetch(`${baseUrl}/api/models`, {
+			headers: {
+				cookie: sessionCookieHeader
+			}
+		});
+		assert(
+			modelsAfterLogoutResponse.status === 401,
+			`Expected /api/models to return 401 after logout, got ${modelsAfterLogoutResponse.status}`
+		);
+		const modelsAfterLogoutBody = await readJsonSafe(modelsAfterLogoutResponse);
+		assert(
+			modelsAfterLogoutBody.error === 'Authentication required',
+			'Expected post-logout /api/models payload to include Authentication required message'
 		);
 
 		console.log('Preview smoke checks passed.');
