@@ -212,6 +212,17 @@ async function run() {
 			unauthenticatedConversationsResponse,
 			'unauthenticated /api/conversations'
 		);
+		const unauthenticatedConversationCreateResponse = await fetch(`${baseUrl}/api/conversations`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				title: 'Unauthorized conversation attempt'
+			})
+		});
+		await assertAuthRequired(
+			unauthenticatedConversationCreateResponse,
+			'unauthenticated POST /api/conversations'
+		);
 		const unauthenticatedMemoriesResponse = await fetch(`${baseUrl}/api/memories`);
 		await assertAuthRequired(unauthenticatedMemoriesResponse, 'unauthenticated /api/memories');
 		const unauthenticatedAuditResponse = await fetch(`${baseUrl}/api/audit`);
@@ -220,6 +231,41 @@ async function run() {
 		await assertAuthRequired(
 			unauthenticatedImageAssetResponse,
 			'unauthenticated /api/images/:id'
+		);
+		const unauthenticatedImageGenerationResponse = await fetch(`${baseUrl}/api/images`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				conversationId: 'test-conversation',
+				prompt: 'unauthorized image prompt',
+				provider: 'zai'
+			})
+		});
+		await assertAuthRequired(
+			unauthenticatedImageGenerationResponse,
+			'unauthenticated POST /api/images'
+		);
+		const unauthenticatedWebSearchResponse = await fetch(`${baseUrl}/api/tools/web-search`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				query: 'latest weather'
+			})
+		});
+		await assertAuthRequired(
+			unauthenticatedWebSearchResponse,
+			'unauthenticated POST /api/tools/web-search'
+		);
+		const unauthenticatedMermaidResponse = await fetch(`${baseUrl}/api/tools/mermaid`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				source: 'graph TD; A-->B;'
+			})
+		});
+		await assertAuthRequired(
+			unauthenticatedMermaidResponse,
+			'unauthenticated POST /api/tools/mermaid'
 		);
 
 		const malformedLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
@@ -285,6 +331,7 @@ async function run() {
 			'Expected invalid /api/auth/login response to avoid setting session cookie'
 		);
 
+		const validLoginStartedAt = Date.now();
 		const validLoginResponse = await fetch(`${baseUrl}/api/auth/login`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -292,7 +339,12 @@ async function run() {
 				password: testPassword
 			})
 		});
+		const validLoginElapsedMs = Date.now() - validLoginStartedAt;
 		assert(validLoginResponse.status === 201, `Expected /api/auth/login 201, got ${validLoginResponse.status}`);
+		assert(
+			validLoginElapsedMs >= 280,
+			`Expected valid /api/auth/login request to take at least 280ms, got ${validLoginElapsedMs}ms`
+		);
 		const validLoginBody = await readJsonSafe(validLoginResponse);
 		assert(validLoginBody.authenticated === true, 'Expected /api/auth/login to return authenticated=true');
 		assert(
@@ -374,6 +426,10 @@ async function run() {
 		assert(
 			logoutSetCookie.toLowerCase().includes('clever_colony_session='),
 			'Expected /api/auth/logout to clear clever_colony_session cookie'
+		);
+		assert(
+			/(max-age=0|expires=thu, 01 jan 1970)/i.test(logoutSetCookie),
+			'Expected /api/auth/logout to expire the session cookie'
 		);
 		const modelsAfterLogoutResponse = await fetch(`${baseUrl}/api/models`, {
 			headers: {
