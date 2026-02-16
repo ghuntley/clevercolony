@@ -312,15 +312,19 @@
 		const controller = new AbortController();
 		auditAbortController = controller;
 		const offset = reset ? 0 : auditOffset;
+		const actionType = auditActionType.trim();
+		const conversationQuery = auditConversationQuery.trim();
+		const dateFrom = auditDateFrom.trim();
+		const dateTo = auditDateTo.trim();
 		const params = new URLSearchParams({
 			limit: String(AUDIT_PAGE_SIZE),
 			offset: String(offset),
 			verify: reset ? '1' : '0'
 		});
-		if (auditActionType) params.set('actionType', auditActionType);
-		if (auditConversationQuery) params.set('conversationQuery', auditConversationQuery);
-		if (auditDateFrom) params.set('dateFrom', auditDateFrom);
-		if (auditDateTo) params.set('dateTo', auditDateTo);
+		if (actionType) params.set('actionType', actionType);
+		if (conversationQuery) params.set('conversationQuery', conversationQuery);
+		if (dateFrom) params.set('dateFrom', dateFrom);
+		if (dateTo) params.set('dateTo', dateTo);
 		try {
 			const data = await fetchJson<{
 				events: AuditEvent[];
@@ -355,16 +359,22 @@
 	}
 
 	function handleAuditFilterChange(next: AuditFilterState) {
+		const normalized = {
+			actionType: next.actionType.trim(),
+			conversationQuery: next.conversationQuery.trim(),
+			dateFrom: next.dateFrom.trim(),
+			dateTo: next.dateTo.trim()
+		} satisfies AuditFilterState;
 		const changed =
-			auditActionType !== next.actionType ||
-			auditConversationQuery !== next.conversationQuery ||
-			auditDateFrom !== next.dateFrom ||
-			auditDateTo !== next.dateTo;
+			auditActionType !== normalized.actionType ||
+			auditConversationQuery !== normalized.conversationQuery ||
+			auditDateFrom !== normalized.dateFrom ||
+			auditDateTo !== normalized.dateTo;
 		if (!changed) return;
-		auditActionType = next.actionType;
-		auditConversationQuery = next.conversationQuery;
-		auditDateFrom = next.dateFrom;
-		auditDateTo = next.dateTo;
+		auditActionType = normalized.actionType;
+		auditConversationQuery = normalized.conversationQuery;
+		auditDateFrom = normalized.dateFrom;
+		auditDateTo = normalized.dateTo;
 		void loadAudit({ reset: true });
 	}
 
