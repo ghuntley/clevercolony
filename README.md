@@ -37,6 +37,12 @@ Run checks:
 npm run check
 ```
 
+Run unit and property-based tests:
+
+```bash
+npm test
+```
+
 Run Storybook:
 
 ```bash
