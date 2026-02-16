@@ -34,6 +34,7 @@
 	let auditChainValid = $state<boolean | null>(null);
 	let auditOffset = $state(0);
 	let auditHasMore = $state(false);
+	let auditTotalCount = $state(0);
 	let auditLoading = $state(false);
 	let streamingText = $state('');
 	let messagesContainer = $state<HTMLElement | null>(null);
@@ -265,10 +266,14 @@
 				events: AuditEvent[];
 				chainValid?: boolean;
 				hasMore?: boolean;
+				totalCount?: number;
 			}>(`/api/audit?limit=${AUDIT_PAGE_SIZE}&offset=${offset}&verify=${reset ? 1 : 0}`);
 			auditEvents = reset ? data.events : [...auditEvents, ...data.events];
 			auditOffset = offset + data.events.length;
 			auditHasMore = Boolean(data.hasMore);
+			if (typeof data.totalCount === 'number') {
+				auditTotalCount = data.totalCount;
+			}
 			if (reset) {
 				auditChainValid = typeof data.chainValid === 'boolean' ? data.chainValid : null;
 			}
@@ -771,6 +776,7 @@
 
 			<AuditTimeline events={auditEvents} chainValid={auditChainValid} />
 			<div class="audit-controls">
+				<p class="audit-count">Loaded {auditEvents.length}{auditTotalCount ? ` / ${auditTotalCount}` : ''} events</p>
 				<button type="button" onclick={() => loadAudit({ reset: true })} disabled={auditLoading}>
 					{auditLoading ? 'Refreshing…' : 'Refresh audit'}
 				</button>
@@ -1068,6 +1074,13 @@
 		flex-wrap: wrap;
 		gap: 0.45rem;
 		margin-top: 0.65rem;
+	}
+
+	.audit-count {
+		margin: 0;
+		font-size: 0.85rem;
+		opacity: 0.82;
+		flex-basis: 100%;
 	}
 
 	.right-rail-mobile-header {

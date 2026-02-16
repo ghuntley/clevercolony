@@ -1,5 +1,5 @@
 import { assertAuthenticatedApi } from '$lib/server/auth';
-import { listAuditEvents, verifyAuditChain } from '$lib/server/db';
+import { countAuditEvents, listAuditEvents, verifyAuditChain } from '$lib/server/db';
 import { getEnv } from '$lib/server/env';
 import { ok } from '$lib/server/http';
 import type { RequestHandler } from './$types';
@@ -22,6 +22,10 @@ export const GET: RequestHandler = async (event) => {
 		actionType,
 		conversationId
 	});
+	const totalCount = await countAuditEvents(env.DB, {
+		actionType,
+		conversationId
+	});
 
 	let chainValid: boolean | undefined;
 	if (includeVerification) {
@@ -33,6 +37,7 @@ export const GET: RequestHandler = async (event) => {
 		chainValid,
 		limit,
 		offset,
-		hasMore: events.length === limit
+		totalCount,
+		hasMore: offset + events.length < totalCount
 	});
 };

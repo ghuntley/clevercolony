@@ -545,6 +545,41 @@ export async function listAuditEvents(
 	return (result.results ?? []).map(toAuditEvent);
 }
 
+export async function countAuditEvents(
+	db: D1Database,
+	options: {
+		actionType?: string | null;
+		conversationId?: string | null;
+	}
+): Promise<number> {
+	if (options.actionType && options.conversationId) {
+		const row = await db
+			.prepare(`SELECT COUNT(*) AS total FROM audit_events WHERE action_type = ?1 AND conversation_id = ?2`)
+			.bind(options.actionType, options.conversationId)
+			.first<{ total: number }>();
+		return Number(row?.total ?? 0);
+	}
+
+	if (options.actionType) {
+		const row = await db
+			.prepare(`SELECT COUNT(*) AS total FROM audit_events WHERE action_type = ?1`)
+			.bind(options.actionType)
+			.first<{ total: number }>();
+		return Number(row?.total ?? 0);
+	}
+
+	if (options.conversationId) {
+		const row = await db
+			.prepare(`SELECT COUNT(*) AS total FROM audit_events WHERE conversation_id = ?1`)
+			.bind(options.conversationId)
+			.first<{ total: number }>();
+		return Number(row?.total ?? 0);
+	}
+
+	const row = await db.prepare(`SELECT COUNT(*) AS total FROM audit_events`).first<{ total: number }>();
+	return Number(row?.total ?? 0);
+}
+
 export async function appendAuditEvent(
 	db: D1Database,
 	input: {
