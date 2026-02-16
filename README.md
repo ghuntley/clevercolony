@@ -88,7 +88,7 @@ npm run test:release
 Run deployed smoke probes against a live URL (unauthenticated checks only):
 
 ```bash
-SMOKE_BASE_URL="https://your-deployment.example" npm run test:deployed
+SMOKE_BASE_URL="https://clevercolony.com" npm run test:deployed
 ```
 
 When `SMOKE_PASSWORD` is omitted, deployed smoke skips credential-dependent login/logout assertions
@@ -97,13 +97,13 @@ and focuses on public/auth-boundary route probes.
 Run deployed smoke probes including authenticated login/logout flow checks:
 
 ```bash
-SMOKE_BASE_URL="https://your-deployment.example" SMOKE_PASSWORD="your-shared-password" npm run test:deployed
+SMOKE_BASE_URL="https://clevercolony.com" SMOKE_PASSWORD="your-shared-password" npm run test:deployed
 ```
 
 Optional tuning for slower environments:
 
 ```bash
-SMOKE_BASE_URL="https://your-deployment.example" SMOKE_REQUEST_TIMEOUT_MS=30000 npm run test:deployed
+SMOKE_BASE_URL="https://clevercolony.com" SMOKE_REQUEST_TIMEOUT_MS=30000 npm run test:deployed
 ```
 
 Run the deployed-smoke runner locally against an ephemeral preview server:
@@ -238,13 +238,13 @@ npm run test:release
 7. Run deployed smoke checks against the target Pages URL before traffic cutover:
 
 ```bash
-SMOKE_BASE_URL="https://your-deployment.example" npm run test:deployed
+SMOKE_BASE_URL="https://clevercolony.com" npm run test:deployed
 ```
 
 Optional authenticated deployed probe (recommended before production cutover):
 
 ```bash
-SMOKE_BASE_URL="https://your-deployment.example" SMOKE_PASSWORD="your-shared-password" npm run test:deployed
+SMOKE_BASE_URL="https://clevercolony.com" SMOKE_PASSWORD="your-shared-password" npm run test:deployed
 ```
 
 ## Security posture (MVP)
