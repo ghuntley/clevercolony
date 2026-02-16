@@ -171,3 +171,11 @@ npm run test:smoke
 - Prompt-submit events store full prompt text.
 - Audit events are append-only by contract and protected by DB triggers.
 - Hash-chain fields (`prev_hash`, `event_hash`) are available for tamper-evidence verification.
+
+## Keyboard shortcuts
+
+- `Ctrl/Cmd + Shift + O`: create a new chat.
+- `Ctrl/Cmd + Shift + ↑`: switch to previous thread in current filtered list.
+- `Ctrl/Cmd + Shift + ↓`: switch to next thread in current filtered list.
+- `Enter`: send message (when composer focused).
+- `Shift + Enter`: newline in composer.
