@@ -6,6 +6,7 @@
 	import type { AuditEvent, ChatMessage, Conversation, MemoryRecord, ModelDefinition } from '$lib/types';
 
 	type Mode = 'chat' | 'image';
+	type Theme = 'dark' | 'light';
 
 	let loading = $state(true);
 	let errorMessage = $state('');
@@ -15,6 +16,7 @@
 	let models = $state<ModelDefinition[]>([]);
 	let selectedModelId = $state('');
 	let mode = $state<Mode>('chat');
+	let theme = $state<Theme>('dark');
 	let prompt = $state('');
 	let generating = $state(false);
 	let webSearchEnabled = $state(false);
@@ -379,6 +381,12 @@
 		window.location.href = '/login';
 	}
 
+	function applyTheme(nextTheme: Theme) {
+		theme = nextTheme;
+		document.documentElement.dataset.theme = nextTheme;
+		window.localStorage.setItem('clever-colony-theme', nextTheme);
+	}
+
 	onMount(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
 			const isModifier = event.ctrlKey || event.metaKey;
@@ -388,6 +396,13 @@
 			}
 		};
 		window.addEventListener('keydown', onKeyDown);
+
+		const storedTheme = window.localStorage.getItem('clever-colony-theme');
+		if (storedTheme === 'dark' || storedTheme === 'light') {
+			applyTheme(storedTheme);
+		} else {
+			applyTheme(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		}
 
 		void (async () => {
 			try {
@@ -495,6 +510,9 @@
 						<input type="checkbox" bind:checked={webSearchEnabled} disabled={mode !== 'chat'} />
 						Web search
 					</label>
+					<button type="button" onclick={() => applyTheme(theme === 'dark' ? 'light' : 'dark')}>
+						Theme: {theme === 'dark' ? 'Dark' : 'Light'}
+					</button>
 				</div>
 			</header>
 
@@ -625,11 +643,38 @@
 {/if}
 
 <style>
-	:global(html),
+	:global(html) {
+		--cc-bg: #0f0f0f;
+		--cc-text: #f3f3f3;
+		--cc-border-strong: #555;
+		--cc-border-soft: #444;
+		--cc-surface: #151515;
+		--cc-surface-muted: #141414;
+		--cc-surface-subtle: #121212;
+		--cc-accent-user: #6e8fbe;
+		--cc-accent-assistant: #6d8f6d;
+		--cc-accent-active: #7ea97e;
+		--cc-error: #ff8b8b;
+	}
+
+	:global(html[data-theme='light']) {
+		--cc-bg: #f5f5f5;
+		--cc-text: #1c1c1c;
+		--cc-border-strong: #606060;
+		--cc-border-soft: #888;
+		--cc-surface: #ffffff;
+		--cc-surface-muted: #f1f1f1;
+		--cc-surface-subtle: #ececec;
+		--cc-accent-user: #3f69a6;
+		--cc-accent-assistant: #3e7a3e;
+		--cc-accent-active: #2f7d32;
+		--cc-error: #b41f1f;
+	}
+
 	:global(body) {
 		margin: 0;
-		background: #0f0f0f;
-		color: #f3f3f3;
+		background: var(--cc-bg);
+		color: var(--cc-text);
 		font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
 			'Courier New', monospace;
 		font-variant-numeric: tabular-nums lining-nums;
@@ -650,7 +695,7 @@
 	.sidebar,
 	.chat,
 	.right-rail {
-		border-right: 2px solid #444;
+		border-right: 2px solid var(--cc-border-soft);
 		padding: 1rem;
 	}
 
@@ -671,8 +716,8 @@
 	button {
 		font: inherit;
 		color: inherit;
-		background: #151515;
-		border: 2px solid #555;
+		background: var(--cc-surface);
+		border: 2px solid var(--cc-border-strong);
 		padding: 0.45rem 0.6rem;
 	}
 
@@ -712,7 +757,7 @@
 	}
 
 	.conversation-row.active {
-		outline: 2px solid #7ea97e;
+		outline: 2px solid var(--cc-accent-active);
 	}
 
 	.conversation-row .title {
@@ -767,9 +812,9 @@
 	}
 
 	.message {
-		border: 2px solid #555;
+		border: 2px solid var(--cc-border-strong);
 		padding: 0.75rem;
-		background: #141414;
+		background: var(--cc-surface-muted);
 	}
 
 	.message header {
@@ -779,11 +824,11 @@
 	}
 
 	.message.user {
-		border-color: #6e8fbe;
+		border-color: var(--cc-accent-user);
 	}
 
 	.message.assistant {
-		border-color: #6d8f6d;
+		border-color: var(--cc-accent-assistant);
 	}
 
 	.message footer {
@@ -797,7 +842,7 @@
 
 	.message img {
 		max-width: 100%;
-		border: 2px solid #555;
+		border: 2px solid var(--cc-border-strong);
 	}
 
 	.composer {
@@ -807,13 +852,13 @@
 
 	.error {
 		margin: 0;
-		color: #ff8b8b;
+		color: var(--cc-error);
 	}
 
 	.memory {
-		border: 2px solid #555;
+		border: 2px solid var(--cc-border-strong);
 		padding: 0.7rem;
-		background: #121212;
+		background: var(--cc-surface-subtle);
 	}
 
 	.memory-create {
@@ -833,7 +878,7 @@
 	}
 
 	.memory li {
-		border: 2px solid #444;
+		border: 2px solid var(--cc-border-soft);
 		padding: 0.55rem;
 	}
 
@@ -854,7 +899,7 @@
 
 		.right-rail {
 			grid-column: 1 / -1;
-			border-top: 2px solid #444;
+			border-top: 2px solid var(--cc-border-soft);
 		}
 	}
 
@@ -866,7 +911,7 @@
 		.sidebar,
 		.chat {
 			border-right: none;
-			border-bottom: 2px solid #444;
+			border-bottom: 2px solid var(--cc-border-soft);
 		}
 	}
 </style>
