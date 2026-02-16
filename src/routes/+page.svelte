@@ -4,6 +4,7 @@
 	import MermaidDiagram from '$lib/components/MermaidDiagram.svelte';
 	import AuditTimeline from '$lib/components/AuditTimeline.svelte';
 	import { groupConversationsByRecency } from '$lib/conversation-groups';
+	import { sortConversations } from '$lib/conversation-sort';
 	import { getModelOptionLabel } from '$lib/model-presentation';
 	import type { AuditEvent, ChatMessage, Conversation, MemoryRecord, ModelDefinition } from '$lib/types';
 
@@ -98,7 +99,7 @@
 
 	async function loadConversations() {
 		const data = await fetchJson<{ conversations: Conversation[] }>('/api/conversations');
-		conversations = data.conversations;
+		conversations = sortConversations(data.conversations);
 		if (!activeConversationId && conversations.length > 0) {
 			await openConversation(conversations[0].id, false);
 		}
@@ -132,7 +133,7 @@
 				provider: model?.provider
 			})
 		});
-		conversations = [data.conversation, ...conversations];
+		conversations = sortConversations([data.conversation, ...conversations]);
 		await openConversation(data.conversation.id, false);
 	}
 
@@ -142,8 +143,8 @@
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(payload)
 		});
-		conversations = conversations.map((conversation) =>
-			conversation.id === conversationId ? data.conversation : conversation
+		conversations = sortConversations(
+			conversations.map((conversation) => (conversation.id === conversationId ? data.conversation : conversation))
 		);
 	}
 
@@ -162,7 +163,7 @@
 	async function removeConversation(conversationId: string) {
 		if (!confirm('Delete this conversation?')) return;
 		await fetchJson<{ deleted: boolean }>(`/api/conversations/${conversationId}`, { method: 'DELETE' });
-		conversations = conversations.filter((conversation) => conversation.id !== conversationId);
+		conversations = sortConversations(conversations.filter((conversation) => conversation.id !== conversationId));
 		if (activeConversationId === conversationId) {
 			activeConversationId = null;
 			messages = [];
@@ -192,7 +193,9 @@
 				fetchJson<{ deleted: boolean }>(`/api/conversations/${conversationId}`, { method: 'DELETE' })
 			)
 		);
-		conversations = conversations.filter((conversation) => !selectedConversationIds.includes(conversation.id));
+		conversations = sortConversations(
+			conversations.filter((conversation) => !selectedConversationIds.includes(conversation.id))
+		);
 		if (activeConversationId && selectedConversationIds.includes(activeConversationId)) {
 			activeConversationId = conversations[0]?.id ?? null;
 			if (activeConversationId) {
