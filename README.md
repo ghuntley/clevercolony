@@ -1,42 +1,92 @@
-# sv
+# Clever Colony
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Clever Colony is a Cloudflare Pages + SvelteKit chat application with:
 
-## Creating a project
+- multi-conversation sidebar (pinning + bulk actions),
+- model selection across ZAI + Cloudflare Workers AI,
+- image generation with R2 storage,
+- editable memory subsystem backed by D1,
+- optional Serper-powered web search grounding,
+- Mermaid diagram rendering,
+- immutable audit trail (append-only + hash-chain).
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Tech stack
 
-```sh
-# create a new project
-npx sv create my-app
+- SvelteKit (Svelte 5 + TypeScript)
+- Cloudflare Pages adapter
+- Cloudflare D1 + R2 + AI bindings
+- Storybook for component development
+
+## Local development
+
+Install dependencies:
+
+```bash
+npm install
 ```
 
-To recreate this project with the same configuration:
+Run app:
 
-```sh
-# recreate this project
-npx sv create --template minimal --types ts --install npm .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
+```bash
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+Run checks:
 
-To create a production version of your app:
+```bash
+npm run check
+```
 
-```sh
+Run Storybook:
+
+```bash
+npm run storybook
+```
+
+Build app:
+
+```bash
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+## Environment variables
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Configure these in Cloudflare Pages project settings (and locally through Wrangler where needed):
+
+- `APP_ACCESS_PASSWORD_HASH` (required)
+- `APP_SESSION_SECRET` (required)
+- `ZAI_API_KEY` (required for ZAI model/image usage)
+- `SERPER_API_KEY` (required when web search toggle is used)
+- `CF_ACCOUNT_ID` + `CF_API_TOKEN` (optional fallback path for Workers AI REST usage)
+
+### Password hash format
+
+Password hash format is:
+
+```text
+pbkdf2_sha256$<iterations>$<salt-base64url>$<digest-base64url>
+```
+
+Use PBKDF2-SHA256 with at least `100000` iterations.
+
+## Cloudflare bindings
+
+`wrangler.toml` expects:
+
+- D1 binding: `DB`
+- R2 binding: `MEDIA_BUCKET`
+- AI binding: `AI`
+
+Apply D1 schema migrations:
+
+```bash
+npx wrangler d1 migrations apply clever-colony --local
+```
+
+## Security posture (MVP)
+
+- Shared-password session gate (browser-session cookie only)
+- Audit events are immutable by API contract and hash-chained
+- R2 image retrieval is auth-gated
+- Mermaid rendering uses strict security mode
+- Web search is opt-in per message and result-capped

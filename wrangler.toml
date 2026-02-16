@@ -1,0 +1,19 @@
+name = "clever-colony"
+compatibility_date = "2026-02-16"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".svelte-kit/cloudflare"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "clever-colony"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "clever-colony-media"
+
+[ai]
+binding = "AI"

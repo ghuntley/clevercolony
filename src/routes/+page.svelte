@@ -1,2 +1,872 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import MarkdownMessage from '$lib/components/MarkdownMessage.svelte';
+	import MermaidDiagram from '$lib/components/MermaidDiagram.svelte';
+	import AuditTimeline from '$lib/components/AuditTimeline.svelte';
+	import type { AuditEvent, ChatMessage, Conversation, MemoryRecord, ModelDefinition } from '$lib/types';
+
+	type Mode = 'chat' | 'image';
+
+	let loading = $state(true);
+	let errorMessage = $state('');
+	let conversations = $state<Conversation[]>([]);
+	let activeConversationId = $state<string | null>(null);
+	let messages = $state<ChatMessage[]>([]);
+	let models = $state<ModelDefinition[]>([]);
+	let selectedModelId = $state('');
+	let mode = $state<Mode>('chat');
+	let prompt = $state('');
+	let generating = $state(false);
+	let webSearchEnabled = $state(false);
+	let conversationSearch = $state('');
+	let selectedConversationIds = $state<string[]>([]);
+	let memories = $state<MemoryRecord[]>([]);
+	let newMemoryText = $state('');
+	let editingMemoryId = $state<string | null>(null);
+	let editingMemoryText = $state('');
+	let auditEvents = $state<AuditEvent[]>([]);
+	let streamingText = $state('');
+
+	const filteredConversations = $derived(
+		conversations.filter((conversation) =>
+			conversation.title.toLowerCase().includes(conversationSearch.toLowerCase())
+		)
+	);
+
+	const pinnedConversations = $derived(filteredConversations.filter((conversation) => conversation.isPinned));
+	const regularConversations = $derived(filteredConversations.filter((conversation) => !conversation.isPinned));
+	const activeConversation = $derived(conversations.find((conversation) => conversation.id === activeConversationId) ?? null);
+
+	$effect(() => {
+		const availableModels = models.filter((model) => (mode === 'chat' ? model.modality === 'text' : model.modality === 'image'));
+		if (availableModels.length === 0) return;
+		if (!availableModels.some((model) => model.id === selectedModelId)) {
+			selectedModelId = availableModels[0].id;
+		}
+	});
+
+	$effect(() => {
+		if (!activeConversation || !selectedModelId) return;
+		if (activeConversation.model === selectedModelId) return;
+		const model = models.find((item) => item.id === selectedModelId);
+		if (!model) return;
+		void updateConversation(activeConversation.id, {
+			model: selectedModelId,
+			provider: model.provider
+		});
+	});
+
+	async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+		const response = await fetch(url, init);
+		if (!response.ok) {
+			const body = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+			throw new Error(body.message ?? body.error ?? `${response.status} ${response.statusText}`);
+		}
+		return response.json() as Promise<T>;
+	}
+
+	async function loadModels() {
+		const data = await fetchJson<{ models: ModelDefinition[] }>('/api/models');
+		models = data.models;
+		if (!selectedModelId && models.length > 0) {
+			selectedModelId = models.find((model) => model.modality === 'text')?.id ?? models[0].id;
+		}
+	}
+
+	async function loadConversations() {
+		const data = await fetchJson<{ conversations: Conversation[] }>('/api/conversations');
+		conversations = data.conversations;
+		if (!activeConversationId && conversations.length > 0) {
+			await openConversation(conversations[0].id, false);
+		}
+	}
+
+	async function openConversation(conversationId: string, syncModel = true) {
+		activeConversationId = conversationId;
+		const data = await fetchJson<{ messages: ChatMessage[] }>(`/api/conversations/${conversationId}`);
+		messages = data.messages;
+		if (syncModel) {
+			const conversation = conversations.find((item) => item.id === conversationId);
+			if (conversation) {
+				selectedModelId = conversation.model;
+			}
+		}
+		await loadMemories();
+	}
+
+	async function createConversation() {
+		const model = models.find((item) => item.id === selectedModelId);
+		const data = await fetchJson<{ conversation: Conversation }>('/api/conversations', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				title: 'New chat',
+				model: selectedModelId,
+				provider: model?.provider
+			})
+		});
+		conversations = [data.conversation, ...conversations];
+		await openConversation(data.conversation.id, false);
+	}
+
+	async function updateConversation(conversationId: string, payload: Record<string, unknown>) {
+		const data = await fetchJson<{ conversation: Conversation }>(`/api/conversations/${conversationId}`, {
+			method: 'PATCH',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(payload)
+		});
+		conversations = conversations.map((conversation) =>
+			conversation.id === conversationId ? data.conversation : conversation
+		);
+	}
+
+	async function renameConversation(conversationId: string) {
+		const current = conversations.find((conversation) => conversation.id === conversationId);
+		if (!current) return;
+		const nextTitle = window.prompt('Rename conversation', current.title)?.trim();
+		if (!nextTitle) return;
+		await updateConversation(conversationId, { title: nextTitle });
+	}
+
+	async function togglePin(conversationId: string, isPinned: boolean) {
+		await updateConversation(conversationId, { isPinned: !isPinned });
+	}
+
+	async function removeConversation(conversationId: string) {
+		if (!confirm('Delete this conversation?')) return;
+		await fetchJson<{ deleted: boolean }>(`/api/conversations/${conversationId}`, { method: 'DELETE' });
+		conversations = conversations.filter((conversation) => conversation.id !== conversationId);
+		if (activeConversationId === conversationId) {
+			activeConversationId = null;
+			messages = [];
+			if (conversations.length > 0) {
+				await openConversation(conversations[0].id, false);
+			}
+		}
+	}
+
+	function toggleBulkSelection(conversationId: string) {
+		selectedConversationIds = selectedConversationIds.includes(conversationId)
+			? selectedConversationIds.filter((item) => item !== conversationId)
+			: [...selectedConversationIds, conversationId];
+	}
+
+	async function bulkPin(setPinned: boolean) {
+		await Promise.all(
+			selectedConversationIds.map((conversationId) => updateConversation(conversationId, { isPinned: setPinned }))
+		);
+		selectedConversationIds = [];
+	}
+
+	async function bulkDelete() {
+		if (!confirm(`Delete ${selectedConversationIds.length} conversations?`)) return;
+		await Promise.all(
+			selectedConversationIds.map((conversationId) =>
+				fetchJson<{ deleted: boolean }>(`/api/conversations/${conversationId}`, { method: 'DELETE' })
+			)
+		);
+		conversations = conversations.filter((conversation) => !selectedConversationIds.includes(conversation.id));
+		if (activeConversationId && selectedConversationIds.includes(activeConversationId)) {
+			activeConversationId = conversations[0]?.id ?? null;
+			if (activeConversationId) {
+				await openConversation(activeConversationId, false);
+			} else {
+				messages = [];
+			}
+		}
+		selectedConversationIds = [];
+	}
+
+	async function loadMemories() {
+		const query = activeConversationId ? `?conversationId=${encodeURIComponent(activeConversationId)}` : '';
+		const data = await fetchJson<{ memories: MemoryRecord[] }>(`/api/memories${query}`);
+		memories = data.memories;
+	}
+
+	async function createMemory() {
+		const content = newMemoryText.trim();
+		if (!content) return;
+		const data = await fetchJson<{ memory: MemoryRecord }>('/api/memories', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				scope: activeConversationId ? 'conversation' : 'global',
+				conversationId: activeConversationId,
+				content
+			})
+		});
+		memories = [data.memory, ...memories];
+		newMemoryText = '';
+	}
+
+	async function saveMemoryEdit() {
+		if (!editingMemoryId) return;
+		const content = editingMemoryText.trim();
+		if (!content) return;
+		const data = await fetchJson<{ memory: MemoryRecord }>('/api/memories', {
+			method: 'PATCH',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				id: editingMemoryId,
+				content
+			})
+		});
+		memories = memories.map((memory) => (memory.id === data.memory.id ? data.memory : memory));
+		editingMemoryId = null;
+		editingMemoryText = '';
+	}
+
+	async function removeMemory(id: string) {
+		await fetchJson<{ deleted: boolean }>(`/api/memories?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+		memories = memories.filter((memory) => memory.id !== id);
+	}
+
+	async function loadAudit() {
+		const data = await fetchJson<{ events: AuditEvent[] }>('/api/audit?limit=100');
+		auditEvents = data.events;
+	}
+
+	function parseSseFrame(frame: string): { type: string; token?: string; metadata?: Record<string, unknown> } | null {
+		const line = frame
+			.split('\n')
+			.map((entry) => entry.trim())
+			.find((entry) => entry.startsWith('data:'));
+		if (!line) return null;
+		try {
+			return JSON.parse(line.slice(5).trim()) as {
+				type: string;
+				token?: string;
+				metadata?: Record<string, unknown>;
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	function appendMessage(message: ChatMessage) {
+		messages = [...messages, message];
+	}
+
+	async function sendChatPrompt() {
+		if (!activeConversationId || !prompt.trim()) return;
+		const messageText = prompt.trim();
+		prompt = '';
+		generating = true;
+		streamingText = '';
+		const model = models.find((item) => item.id === selectedModelId);
+
+		const userMessage: ChatMessage = {
+			id: crypto.randomUUID(),
+			conversationId: activeConversationId,
+			role: 'user',
+			contentType: 'text',
+			content: messageText,
+			createdAt: Date.now(),
+			updatedAt: Date.now()
+		};
+		appendMessage(userMessage);
+
+		try {
+			const response = await fetch('/api/chat', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					conversationId: activeConversationId,
+					text: messageText,
+					model: selectedModelId,
+					provider: model?.provider,
+					webSearchEnabled
+				})
+			});
+			if (!response.ok || !response.body) {
+				throw new Error('Unable to stream assistant response');
+			}
+
+			const reader = response.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = '';
+			let doneMetadata: Record<string, unknown> | null = null;
+			while (true) {
+				const chunk = await reader.read();
+				if (chunk.done) break;
+				buffer += decoder.decode(chunk.value, { stream: true });
+				const frames = buffer.split('\n\n');
+				buffer = frames.pop() ?? '';
+				for (const frame of frames) {
+					const data = parseSseFrame(frame);
+					if (!data) continue;
+					if (data.type === 'token' && data.token) {
+						streamingText += data.token;
+					}
+					if (data.type === 'done') {
+						doneMetadata = data.metadata ?? null;
+					}
+				}
+			}
+
+			appendMessage({
+				id: (doneMetadata?.messageId as string) ?? crypto.randomUUID(),
+				conversationId: activeConversationId,
+				role: 'assistant',
+				contentType: 'text',
+				content: streamingText,
+				metadata: {
+					citations: doneMetadata?.citations ?? []
+				},
+				createdAt: Date.now(),
+				updatedAt: Date.now()
+			});
+
+			const diagram = doneMetadata?.diagram as { mermaidSource?: string } | undefined;
+			if (diagram?.mermaidSource) {
+				appendMessage({
+					id: crypto.randomUUID(),
+					conversationId: activeConversationId,
+					role: 'assistant',
+					contentType: 'diagram',
+					content: diagram.mermaidSource,
+					metadata: diagram,
+					createdAt: Date.now(),
+					updatedAt: Date.now()
+				});
+			}
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+		} finally {
+			generating = false;
+			streamingText = '';
+			await loadConversations();
+			await loadAudit();
+		}
+	}
+
+	async function sendImagePrompt() {
+		if (!activeConversationId || !prompt.trim()) return;
+		const model = models.find((item) => item.id === selectedModelId);
+		generating = true;
+		try {
+			await fetchJson('/api/images', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					conversationId: activeConversationId,
+					prompt: prompt.trim(),
+					model: selectedModelId,
+					provider: model?.provider
+				})
+			});
+			prompt = '';
+			await openConversation(activeConversationId, false);
+			await loadAudit();
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Failed to generate image';
+		} finally {
+			generating = false;
+		}
+	}
+
+	async function handleSubmit() {
+		errorMessage = '';
+		if (mode === 'chat') {
+			await sendChatPrompt();
+			return;
+		}
+		await sendImagePrompt();
+	}
+
+	async function logout() {
+		await fetch('/api/auth/logout', { method: 'POST' });
+		window.location.href = '/login';
+	}
+
+	onMount(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			const isModifier = event.ctrlKey || event.metaKey;
+			if (isModifier && event.shiftKey && event.key.toLowerCase() === 'o') {
+				event.preventDefault();
+				void createConversation();
+			}
+		};
+		window.addEventListener('keydown', onKeyDown);
+
+		void (async () => {
+			try {
+				await Promise.all([loadModels(), loadConversations(), loadAudit()]);
+				await loadMemories();
+			} catch (error) {
+				errorMessage = error instanceof Error ? error.message : 'Failed to initialize application';
+			} finally {
+				loading = false;
+			}
+		})();
+
+		return () => {
+			window.removeEventListener('keydown', onKeyDown);
+		};
+	});
+</script>
+
+{#if loading}
+	<main class="loading">Loading Clever Colony…</main>
+{:else}
+	<div class="app">
+		<aside class="sidebar">
+			<header>
+				<h1>Clever Colony</h1>
+				<button type="button" onclick={createConversation}>+ New chat</button>
+			</header>
+			<input bind:value={conversationSearch} placeholder="Search your threads…" />
+
+			{#if selectedConversationIds.length > 0}
+				<div class="bulk">
+					<span>{selectedConversationIds.length} selected</span>
+					<button type="button" onclick={() => bulkPin(true)}>Pin</button>
+					<button type="button" onclick={() => bulkPin(false)}>Unpin</button>
+					<button type="button" onclick={bulkDelete}>Delete</button>
+				</div>
+			{/if}
+
+			{#if pinnedConversations.length > 0}
+				<section>
+					<h2>Pinned</h2>
+					{#each pinnedConversations as conversation (conversation.id)}
+						<div class="conversation-row {activeConversationId === conversation.id ? 'active' : ''}">
+							<input
+								type="checkbox"
+								checked={selectedConversationIds.includes(conversation.id)}
+								onchange={() => toggleBulkSelection(conversation.id)}
+							/>
+							<button type="button" class="title" onclick={() => openConversation(conversation.id)}>
+								{conversation.title}
+							</button>
+							<button type="button" onclick={() => togglePin(conversation.id, conversation.isPinned)}>★</button>
+						</div>
+					{/each}
+				</section>
+			{/if}
+
+			<section>
+				<h2>Chats</h2>
+				{#each regularConversations as conversation (conversation.id)}
+					<div class="conversation-row {activeConversationId === conversation.id ? 'active' : ''}">
+						<input
+							type="checkbox"
+							checked={selectedConversationIds.includes(conversation.id)}
+							onchange={() => toggleBulkSelection(conversation.id)}
+						/>
+						<button type="button" class="title" onclick={() => openConversation(conversation.id)}>
+							{conversation.title}
+						</button>
+						<div class="row-actions">
+							<button type="button" onclick={() => renameConversation(conversation.id)}>✎</button>
+							<button type="button" onclick={() => togglePin(conversation.id, conversation.isPinned)}>☆</button>
+							<button type="button" onclick={() => removeConversation(conversation.id)}>⌫</button>
+						</div>
+					</div>
+				{/each}
+			</section>
+
+			<button type="button" class="logout" onclick={logout}>Logout</button>
+		</aside>
+
+		<main class="chat">
+			<header class="chat-header">
+				<div>
+					<h2>{activeConversation?.title ?? 'No conversation selected'}</h2>
+					<p>{activeConversation ? activeConversation.model : 'Choose a conversation to start'}</p>
+				</div>
+				<div class="controls">
+					<label>
+						Mode
+						<select bind:value={mode}>
+							<option value="chat">Chat</option>
+							<option value="image">Image</option>
+						</select>
+					</label>
+					<label>
+						Model
+						<select bind:value={selectedModelId}>
+							{#each models.filter((model) => (mode === 'chat' ? model.modality === 'text' : model.modality === 'image')) as model}
+								<option value={model.id}>{model.label} · {model.provider}</option>
+							{/each}
+						</select>
+					</label>
+					<label class="toggle">
+						<input type="checkbox" bind:checked={webSearchEnabled} disabled={mode !== 'chat'} />
+						Web search
+					</label>
+				</div>
+			</header>
+
+			<section class="messages">
+				{#if messages.length === 0}
+					<p class="empty">Start a new chat and send a prompt.</p>
+				{/if}
+				{#each messages as message (message.id)}
+					<article class="message {message.role}">
+						<header>
+							<strong>{message.role}</strong>
+							<time>{new Date(message.createdAt).toLocaleTimeString()}</time>
+						</header>
+						{#if message.contentType === 'text'}
+							<MarkdownMessage content={message.content} />
+							{@const citations = (message.metadata?.citations ?? []) as Array<{ title: string; url: string }>}
+							{#if citations.length}
+								<footer>
+									<strong>Sources</strong>
+									<ul>
+										{#each citations as citation}
+											<li><a href={citation.url} target="_blank" rel="noopener noreferrer">{citation.title}</a></li>
+										{/each}
+									</ul>
+								</footer>
+							{/if}
+						{:else if message.contentType === 'image'}
+							<p>{message.content}</p>
+							{#if typeof message.metadata?.url === 'string'}
+								<img src={message.metadata.url} alt="Generated artwork" loading="lazy" />
+							{/if}
+						{:else if message.contentType === 'diagram'}
+							<MermaidDiagram source={message.content} />
+						{/if}
+					</article>
+				{/each}
+				{#if streamingText}
+					<article class="message assistant streaming">
+						<header>
+							<strong>assistant</strong>
+							<time>streaming…</time>
+						</header>
+						<MarkdownMessage content={streamingText} />
+					</article>
+				{/if}
+			</section>
+
+			<form
+				class="composer"
+				onsubmit={(event) => {
+					event.preventDefault();
+					void handleSubmit();
+				}}
+				title="Enter to send · Shift+Enter newline · Ctrl/Cmd+Shift+O new chat"
+			>
+				<textarea
+					bind:value={prompt}
+					rows="4"
+					placeholder={mode === 'chat'
+						? 'Ask anything (Enter to send, Shift+Enter newline)'
+						: 'Describe the image you want to generate'}
+					onkeydown={(event) => {
+						if (event.key === 'Enter' && !event.shiftKey) {
+							event.preventDefault();
+							void handleSubmit();
+						}
+					}}
+				></textarea>
+				<button type="submit" disabled={generating || !activeConversationId}>
+					{generating ? 'Working…' : mode === 'chat' ? 'Send' : 'Generate image'}
+				</button>
+			</form>
+
+			{#if errorMessage}
+				<p class="error">{errorMessage}</p>
+			{/if}
+		</main>
+
+		<aside class="right-rail">
+			<section class="memory">
+				<header>
+					<h3>Memory subsystem</h3>
+				</header>
+				<div class="memory-create">
+					<textarea bind:value={newMemoryText} rows="3" placeholder="Remember this…"></textarea>
+					<button type="button" onclick={createMemory}>Add memory</button>
+				</div>
+				<ul>
+					{#each memories as memory (memory.id)}
+						<li>
+							{#if editingMemoryId === memory.id}
+								<textarea bind:value={editingMemoryText} rows="3"></textarea>
+								<div class="memory-actions">
+									<button type="button" onclick={saveMemoryEdit}>Save</button>
+									<button
+										type="button"
+										onclick={() => {
+											editingMemoryId = null;
+											editingMemoryText = '';
+										}}
+									>
+										Cancel
+									</button>
+								</div>
+							{:else}
+								<p>{memory.content}</p>
+								<div class="memory-actions">
+									<button
+										type="button"
+										onclick={() => {
+											editingMemoryId = memory.id;
+											editingMemoryText = memory.content;
+										}}
+									>
+										Edit
+									</button>
+									<button type="button" onclick={() => removeMemory(memory.id)}>Delete</button>
+								</div>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			</section>
+
+			<AuditTimeline events={auditEvents} />
+		</aside>
+	</div>
+{/if}
+
+<style>
+	:global(html),
+	:global(body) {
+		margin: 0;
+		background: #0f0f0f;
+		color: #f3f3f3;
+		font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+			'Courier New', monospace;
+		font-variant-numeric: tabular-nums lining-nums;
+	}
+
+	.loading {
+		min-height: 100vh;
+		display: grid;
+		place-items: center;
+	}
+
+	.app {
+		display: grid;
+		grid-template-columns: 34ch 1fr 34ch;
+		min-height: 100vh;
+	}
+
+	.sidebar,
+	.chat,
+	.right-rail {
+		border-right: 2px solid #444;
+		padding: 1rem;
+	}
+
+	.right-rail {
+		border-right: none;
+	}
+
+	.sidebar header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.75rem;
+	}
+
+	input,
+	select,
+	textarea,
+	button {
+		font: inherit;
+		color: inherit;
+		background: #151515;
+		border: 2px solid #555;
+		padding: 0.45rem 0.6rem;
+	}
+
+	button {
+		cursor: pointer;
+	}
+
+	.sidebar > input {
+		width: 100%;
+		margin-bottom: 0.75rem;
+	}
+
+	.bulk {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		align-items: center;
+		margin-bottom: 0.6rem;
+	}
+
+	section {
+		margin-bottom: 1rem;
+	}
+
+	h1,
+	h2,
+	h3 {
+		margin: 0 0 0.5rem;
+	}
+
+	.conversation-row {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		align-items: center;
+		gap: 0.35rem;
+		margin-bottom: 0.35rem;
+	}
+
+	.conversation-row.active {
+		outline: 2px solid #7ea97e;
+	}
+
+	.conversation-row .title {
+		text-align: left;
+	}
+
+	.row-actions {
+		display: inline-flex;
+		gap: 0.3rem;
+	}
+
+	.logout {
+		width: 100%;
+	}
+
+	.chat {
+		display: grid;
+		grid-template-rows: auto 1fr auto auto;
+		gap: 1rem;
+	}
+
+	.chat-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		gap: 1rem;
+	}
+
+	.controls {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+
+	.controls label {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.toggle {
+		display: inline-flex !important;
+		align-items: center;
+		gap: 0.4rem;
+	}
+
+	.messages {
+		overflow: auto;
+		display: grid;
+		gap: 0.8rem;
+		padding-right: 0.3rem;
+	}
+
+	.message {
+		border: 2px solid #555;
+		padding: 0.75rem;
+		background: #141414;
+	}
+
+	.message header {
+		display: flex;
+		justify-content: space-between;
+		margin-bottom: 0.55rem;
+	}
+
+	.message.user {
+		border-color: #6e8fbe;
+	}
+
+	.message.assistant {
+		border-color: #6d8f6d;
+	}
+
+	.message footer {
+		margin-top: 0.6rem;
+	}
+
+	.message ul {
+		margin: 0.4rem 0 0;
+		padding-left: 1.3rem;
+	}
+
+	.message img {
+		max-width: 100%;
+		border: 2px solid #555;
+	}
+
+	.composer {
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.error {
+		margin: 0;
+		color: #ff8b8b;
+	}
+
+	.memory {
+		border: 2px solid #555;
+		padding: 0.7rem;
+		background: #121212;
+	}
+
+	.memory-create {
+		display: grid;
+		gap: 0.45rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.memory ul {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		gap: 0.55rem;
+		max-height: 26vh;
+		overflow: auto;
+	}
+
+	.memory li {
+		border: 2px solid #444;
+		padding: 0.55rem;
+	}
+
+	.memory p {
+		margin: 0;
+	}
+
+	.memory-actions {
+		display: flex;
+		gap: 0.4rem;
+		margin-top: 0.45rem;
+	}
+
+	@media (max-width: 1300px) {
+		.app {
+			grid-template-columns: 30ch 1fr;
+		}
+
+		.right-rail {
+			grid-column: 1 / -1;
+			border-top: 2px solid #444;
+		}
+	}
+
+	@media (max-width: 900px) {
+		.app {
+			grid-template-columns: 1fr;
+		}
+
+		.sidebar,
+		.chat {
+			border-right: none;
+			border-bottom: 2px solid #444;
+		}
+	}
+</style>

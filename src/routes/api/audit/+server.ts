@@ -1,0 +1,33 @@
+import { assertAuthenticatedApi } from '$lib/server/auth';
+import { listAuditEvents, verifyAuditChain } from '$lib/server/db';
+import { getEnv } from '$lib/server/env';
+import { ok } from '$lib/server/http';
+import type { RequestHandler } from './$types';
+
+export const GET: RequestHandler = async (event) => {
+	assertAuthenticatedApi(event);
+	const env = getEnv(event);
+
+	const limit = Number(event.url.searchParams.get('limit') ?? 50);
+	const offset = Number(event.url.searchParams.get('offset') ?? 0);
+	const actionType = event.url.searchParams.get('actionType');
+	const conversationId = event.url.searchParams.get('conversationId');
+	const includeVerification = event.url.searchParams.get('verify') === '1';
+
+	const events = await listAuditEvents(env.DB, {
+		limit,
+		offset,
+		actionType,
+		conversationId
+	});
+
+	let chainValid: boolean | undefined;
+	if (includeVerification) {
+		chainValid = await verifyAuditChain(env.DB);
+	}
+
+	return ok({
+		events,
+		chainValid
+	});
+};
