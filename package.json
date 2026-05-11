@@ -50,7 +50,7 @@
 	"dependencies": {
 		"isomorphic-dompurify": "^3.0.0-rc.2",
 		"marked": "^17.0.2",
-		"mermaid": "^11.12.2",
+		"mermaid": "^11.15.0",
 		"zod": "^4.3.6"
 	}
 }
